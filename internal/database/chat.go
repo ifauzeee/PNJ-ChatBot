@@ -3,79 +3,10 @@ package database
 import (
 	"database/sql"
 	"fmt"
-	"strings"
 	"time"
 
-	"github.com/Masterminds/squirrel"
 	"github.com/pnj-anonymous-bot/internal/models"
 )
-
-func (d *DB) AddToQueue(telegramID int64, preferredDept, preferredGender string, preferredYear int) error {
-	query, args, _ := d.Builder.Insert("chat_queue").
-		Columns("telegram_id", "preferred_dept", "preferred_gender", "preferred_year", "joined_at").
-		Values(telegramID, preferredDept, preferredGender, preferredYear, time.Now()).
-		ToSql()
-
-	_, err := d.Exec(strings.Replace(query, "INSERT INTO", "INSERT OR REPLACE INTO", 1), args...)
-	return err
-}
-
-func (d *DB) RemoveFromQueue(telegramID int64) error {
-	query, args, _ := d.Builder.Delete("chat_queue").Where("telegram_id = ?", telegramID).ToSql()
-	_, err := d.Exec(query, args...)
-	return err
-}
-
-func (d *DB) IsInQueue(telegramID int64) (bool, error) {
-	var count int
-	query, args, _ := d.Builder.Select("COUNT(*)").From("chat_queue").Where("telegram_id = ?", telegramID).ToSql()
-	err := d.Get(&count, query, args...)
-	return count > 0, err
-}
-
-func (d *DB) FindMatch(telegramID int64, preferredDept, preferredGender string, preferredYear int) (int64, error) {
-	var matchID int64
-
-	b := d.Builder.Select("cq.telegram_id").
-		From("chat_queue cq").
-		Join("users u ON cq.telegram_id = u.telegram_id").
-		Where("cq.telegram_id != ?", telegramID).
-		Where("u.is_banned = FALSE")
-
-	if preferredDept != "" {
-		b = b.Where("u.department = ?", preferredDept)
-	}
-
-	if preferredGender != "" {
-		b = b.Where("u.gender = ?", preferredGender)
-	}
-
-	if preferredYear != 0 {
-		b = b.Where("u.year = ?", preferredYear)
-	}
-
-	b = b.Where(squirrel.Expr("cq.telegram_id NOT IN ("+
-		"SELECT blocked_id FROM blocked_users WHERE user_id = ? "+
-		"UNION "+
-		"SELECT user_id FROM blocked_users WHERE blocked_id = ?)",
-		telegramID, telegramID))
-
-	b = b.OrderBy("u.karma DESC", "cq.joined_at ASC").Limit(1)
-
-	query, args, err := b.ToSql()
-	if err != nil {
-		return 0, err
-	}
-
-	err = d.Get(&matchID, query, args...)
-	if err == sql.ErrNoRows {
-		return 0, nil
-	}
-	if err != nil {
-		return 0, fmt.Errorf("failed to find match: %w", err)
-	}
-	return matchID, nil
-}
 
 func (d *DB) StopChat(telegramID int64) (int64, error) {
 	session, err := d.GetActiveSession(telegramID)
@@ -106,13 +37,6 @@ func (d *DB) StopChat(telegramID int64) (int64, error) {
 	}
 
 	return partnerID, nil
-}
-
-func (d *DB) GetQueueCount() (int, error) {
-	var count int
-	query, args, _ := d.Builder.Select("COUNT(*)").From("chat_queue").ToSql()
-	err := d.Get(&count, query, args...)
-	return count, err
 }
 
 func (d *DB) CreateChatSession(user1ID, user2ID int64) (*models.ChatSession, error) {
@@ -201,32 +125,4 @@ func (d *DB) GetTotalChatSessions(telegramID int64) (int, error) {
 		Where("user1_id = ? OR user2_id = ?", telegramID, telegramID).ToSql()
 	err := d.Get(&count, query, args...)
 	return count, err
-}
-
-func (d *DB) GetExpiredQueueItems(timeoutSeconds int) ([]models.ChatQueue, error) {
-	threshold := time.Now().Add(-time.Duration(timeoutSeconds) * time.Second)
-
-	query, args, err := d.Builder.Select("telegram_id", "preferred_dept", "preferred_gender", "preferred_year", "joined_at").
-		From("chat_queue").
-		Where("(preferred_dept != '' OR preferred_gender != '' OR preferred_year != 0)").
-		Where("joined_at <= ?", threshold).ToSql()
-
-	if err != nil {
-		return nil, err
-	}
-
-	var items []models.ChatQueue
-	err = d.Select(&items, query, args...)
-	return items, err
-}
-
-func (d *DB) ClearQueueFilters(telegramID int64) error {
-	query, args, _ := d.Builder.Update("chat_queue").
-		Set("preferred_dept", "").
-		Set("preferred_gender", "").
-		Set("preferred_year", 0).
-		Where("telegram_id = ?", telegramID).ToSql()
-
-	_, err := d.Exec(query, args...)
-	return err
 }

@@ -1,7 +1,7 @@
 package main
 
 import (
-	"os"
+	"context"
 	"os/signal"
 	"syscall"
 
@@ -46,15 +46,10 @@ func main() {
 		logger.Fatal("❌ Failed to create bot", zap.Error(err))
 	}
 
-	quit := make(chan os.Signal, 1)
-	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
 
-	go func() {
-		<-quit
-		logger.Info("🛑 Shutting down gracefully...")
-		db.Close()
-		os.Exit(0)
-	}()
-
-	b.Start()
+	if err := b.Start(ctx); err != nil {
+		logger.Fatal("Bot stopped with error", zap.Error(err))
+	}
 }

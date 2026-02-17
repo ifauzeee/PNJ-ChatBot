@@ -1,10 +1,12 @@
 package bot
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"runtime"
+	"strconv"
 	"sync"
 	"time"
 
@@ -14,10 +16,36 @@ import (
 	"github.com/pnj-anonymous-bot/internal/logger"
 	"github.com/pnj-anonymous-bot/internal/models"
 	"github.com/pnj-anonymous-bot/internal/service"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.uber.org/zap"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
+)
+
+var (
+	updateQueueDepthGauge = promauto.NewGauge(prometheus.GaugeOpts{
+		Name: "pnj_bot_update_queue_depth",
+		Help: "Current number of pending Telegram updates in worker queue.",
+	})
+
+	updateProcessDurationSeconds = promauto.NewHistogramVec(prometheus.HistogramOpts{
+		Name:    "pnj_bot_update_process_duration_seconds",
+		Help:    "Time spent processing a Telegram update in worker pool.",
+		Buckets: prometheus.ExponentialBuckets(0.005, 2, 12),
+	}, []string{"user_id", "update_type"})
+
+	userLockWaitSeconds = promauto.NewHistogramVec(prometheus.HistogramOpts{
+		Name:    "pnj_bot_user_lock_wait_seconds",
+		Help:    "Wait time to acquire per-user lock before update processing.",
+		Buckets: prometheus.ExponentialBuckets(0.0005, 2, 12),
+	}, []string{"user_id"})
+
+	userLockContentionTotal = promauto.NewCounterVec(prometheus.CounterOpts{
+		Name: "pnj_bot_user_lock_contention_total",
+		Help: "Number of updates waiting for contested per-user locks.",
+	}, []string{"user_id"})
 )
 
 type Bot struct {
@@ -32,6 +60,7 @@ type Bot struct {
 	startedAt  time.Time
 	updateQ    chan tgbotapi.Update
 	updateWG   sync.WaitGroup
+	background sync.WaitGroup
 	userLocks  sync.Map
 }
 
@@ -75,7 +104,7 @@ type HealthResponse struct {
 	Timestamp  string `json:"timestamp"`
 }
 
-func (b *Bot) startHealthServer() {
+func (b *Bot) startHealthServer(ctx context.Context) {
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
@@ -123,6 +152,15 @@ func (b *Bot) startHealthServer() {
 		WriteTimeout: 10 * time.Second,
 		IdleTimeout:  30 * time.Second,
 	}
+	go func() {
+		<-ctx.Done()
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+
+		if err := server.Shutdown(shutdownCtx); err != nil {
+			logger.Warn("Health server shutdown error", zap.Error(err))
+		}
+	}()
 
 	logger.Info("🏥 Health check server listening on :8080")
 	if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
@@ -130,10 +168,15 @@ func (b *Bot) startHealthServer() {
 	}
 }
 
-func (b *Bot) startQueueWorker() {
+func (b *Bot) startQueueWorker(ctx context.Context) {
 	ticker := time.NewTicker(30 * time.Second)
-	go func() {
-		for range ticker.C {
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
 			updatedIDs, err := b.chat.ProcessQueueTimeout(60)
 			if err != nil {
 				logger.Error("⚠️ Queue worker error", zap.Error(err))
@@ -149,7 +192,7 @@ _Mohon tunggu sebentar ya..._`
 				b.sendMessage(telegramID, msg, nil)
 			}
 		}
-	}()
+	}
 }
 
 func (b *Bot) startUpdateWorkers() {
@@ -160,6 +203,7 @@ func (b *Bot) startUpdateWorkers() {
 		go func() {
 			defer b.updateWG.Done()
 			for update := range b.updateQ {
+				updateQueueDepthGauge.Set(float64(len(b.updateQ)))
 				b.handleUpdate(update)
 			}
 			logger.Debug("Update worker stopped", zap.Int("worker_id", workerID))
@@ -170,13 +214,30 @@ func (b *Bot) startUpdateWorkers() {
 		zap.Int("workers", b.cfg.MaxUpdateWorkers),
 		zap.Int("queue_size", cap(b.updateQ)),
 	)
+	updateQueueDepthGauge.Set(0)
 }
 
-func (b *Bot) Start() {
+func (b *Bot) Start(ctx context.Context) error {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	runCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
 	logger.Info("🚀 Starting PNJ Anonymous Bot...")
 
-	go b.startHealthServer()
-	b.startQueueWorker()
+	b.background.Add(1)
+	go func() {
+		defer b.background.Done()
+		b.startHealthServer(runCtx)
+	}()
+
+	b.background.Add(1)
+	go func() {
+		defer b.background.Done()
+		b.startQueueWorker(runCtx)
+	}()
+
 	b.startUpdateWorkers()
 
 	commands := []tgbotapi.BotCommand{
@@ -203,31 +264,70 @@ func (b *Bot) Start() {
 		{Command: "cancel", Description: "❌ Batalkan aksi saat ini"},
 	}
 	cmdCfg := tgbotapi.NewSetMyCommands(commands...)
-	b.api.Send(cmdCfg)
+	if _, err := b.api.Send(cmdCfg); err != nil {
+		logger.Warn("Failed to set bot commands", zap.Error(err))
+	}
 
 	u := tgbotapi.NewUpdate(0)
 	u.Timeout = 60
 
 	updates := b.api.GetUpdatesChan(u)
 
-	for update := range updates {
-		b.updateQ <- update
+intakeLoop:
+	for {
+		select {
+		case <-runCtx.Done():
+			logger.Info("Stopping update intake...")
+			b.api.StopReceivingUpdates()
+			break intakeLoop
+		case update, ok := <-updates:
+			if !ok {
+				break intakeLoop
+			}
+
+			select {
+			case b.updateQ <- update:
+				updateQueueDepthGauge.Set(float64(len(b.updateQ)))
+			case <-runCtx.Done():
+				logger.Info("Stopping update intake...")
+				b.api.StopReceivingUpdates()
+				break intakeLoop
+			}
+		}
 	}
 
 	close(b.updateQ)
 	b.updateWG.Wait()
+	cancel()
+	b.background.Wait()
+	updateQueueDepthGauge.Set(0)
+	logger.Info("Bot shutdown completed")
+
+	return nil
 }
 
 func (b *Bot) handleUpdate(update tgbotapi.Update) {
+	startedAt := time.Now()
+	userID, hasUser := b.extractUpdateUserID(update)
+	userLabel := updateMetricUserLabel(userID, hasUser)
+	updateType := classifyUpdate(update)
+
 	defer func() {
 		if r := recover(); r != nil {
 			logger.Error("❌ Panic recovered", zap.Any("recover", r))
 		}
+		updateProcessDurationSeconds.WithLabelValues(userLabel, updateType).Observe(time.Since(startedAt).Seconds())
 	}()
 
-	if userID, ok := b.extractUpdateUserID(update); ok {
+	if hasUser {
 		lock := b.getUserLock(userID)
+		lockWaitStart := time.Now()
 		lock.Lock()
+		lockWait := time.Since(lockWaitStart)
+		userLockWaitSeconds.WithLabelValues(userLabel).Observe(lockWait.Seconds())
+		if lockWait > time.Millisecond {
+			userLockContentionTotal.WithLabelValues(userLabel).Inc()
+		}
 		defer lock.Unlock()
 	}
 
@@ -246,6 +346,26 @@ func (b *Bot) handleUpdate(update tgbotapi.Update) {
 	}
 
 	b.handleMessage(update.Message)
+}
+
+func updateMetricUserLabel(userID int64, hasUser bool) string {
+	if !hasUser {
+		return "unknown"
+	}
+	return strconv.FormatInt(userID, 10)
+}
+
+func classifyUpdate(update tgbotapi.Update) string {
+	if update.CallbackQuery != nil {
+		return "callback"
+	}
+	if update.Message == nil {
+		return "other"
+	}
+	if update.Message.IsCommand() {
+		return "command"
+	}
+	return "message"
 }
 
 func (b *Bot) extractUpdateUserID(update tgbotapi.Update) (int64, bool) {

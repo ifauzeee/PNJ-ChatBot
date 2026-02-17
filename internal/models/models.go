@@ -178,15 +178,6 @@ type ChatSession struct {
 	EndedAt   *time.Time `json:"ended_at" db:"ended_at"`
 }
 
-type ChatQueue struct {
-	ID              int64     `json:"id" db:"id"`
-	TelegramID      int64     `json:"telegram_id" db:"telegram_id"`
-	PreferredDept   string    `json:"preferred_dept" db:"preferred_dept"`
-	PreferredGender string    `json:"preferred_gender" db:"preferred_gender"`
-	PreferredYear   int       `json:"preferred_year" db:"preferred_year"`
-	JoinedAt        time.Time `json:"joined_at" db:"joined_at"`
-}
-
 type Confession struct {
 	ID         int64     `json:"id" db:"id"`
 	AuthorID   int64     `json:"author_id" db:"author_id"`
