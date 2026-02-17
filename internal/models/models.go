@@ -115,7 +115,27 @@ const (
 	StateAwaitingWhisper     UserState = "awaiting_whisper"
 	StateAwaitingWhisperDept UserState = "awaiting_whisper_dept"
 	StateAwaitingEditField   UserState = "awaiting_edit_field"
+	StateInCircle            UserState = "in_circle"
+	StateAwaitingRoomName    UserState = "awaiting_room_name"
+	StateAwaitingRoomDesc    UserState = "awaiting_room_desc"
 )
+
+type Room struct {
+	ID          int64     `json:"id"`
+	Slug        string    `json:"slug"`
+	Name        string    `json:"name"`
+	Description string    `json:"description"`
+	MemberCount int       `json:"member_count"`
+	IsActive    bool      `json:"is_active"`
+	CreatedAt   time.Time `json:"created_at"`
+}
+
+type RoomMember struct {
+	ID         int64     `json:"id"`
+	RoomID     int64     `json:"room_id"`
+	TelegramID int64     `json:"telegram_id"`
+	JoinedAt   time.Time `json:"joined_at"`
+}
 
 type VerificationCode struct {
 	ID         int64     `json:"id"`

@@ -47,6 +47,8 @@ func (b *Bot) handleCallback(callback *tgbotapi.CallbackQuery) {
 		b.handleWhisperCallback(telegramID, value, callback)
 	case "legal":
 		b.handleLegalCallback(telegramID, value, callback)
+	case "circle":
+		b.handleCircleCallback(telegramID, value, callback)
 	}
 }
 
@@ -268,6 +270,9 @@ Atau ketik /cancel untuk membatalkan.
 		kb := WhisperDeptKeyboard()
 		b.sendMessage(telegramID, "📢 *Whisper - Pesan Anonim ke Jurusan*\n\n🎯 Pilih jurusan tujuan:", &kb)
 
+	case "circles":
+		b.handleCircles(&tgbotapi.Message{From: &tgbotapi.User{ID: telegramID}})
+
 	case "profile":
 		msg := &tgbotapi.Message{From: &tgbotapi.User{ID: telegramID}}
 		b.handleProfile(msg)
@@ -418,5 +423,71 @@ func (b *Bot) handleLegalCallback(telegramID int64, value string, callback *tgbo
 		b.api.Send(deleteMsg)
 
 		b.startEmailVerif(telegramID)
+	}
+}
+
+func (b *Bot) handleCircleCallback(telegramID int64, data string, callback *tgbotapi.CallbackQuery) {
+	parts := strings.SplitN(data, ":", 2)
+	action := parts[0]
+
+	switch action {
+	case "join":
+		if len(parts) < 2 {
+			return
+		}
+
+		state, _, _ := b.db.GetUserState(telegramID)
+		if state == models.StateInChat {
+			b.answerCallback(callback.ID, "⚠️ Akhiri chat aktif kamu dulu (/stop) sebelum gabung ke circle.")
+			return
+		}
+
+		slug := parts[1]
+		room, err := b.room.JoinRoom(telegramID, slug)
+		if err != nil {
+			b.answerCallback(callback.ID, "❌ "+err.Error())
+			return
+		}
+
+		deleteMsg := tgbotapi.NewDeleteMessage(telegramID, callback.Message.MessageID)
+		b.api.Send(deleteMsg)
+
+		kb := LeaveCircleKeyboard()
+		text := fmt.Sprintf(`🎉 <b>Berhasil Terhubung ke Circle %s</b>
+
+━━━━━━━━━━━━━━━━━━━
+Sekarang semua pesan yang kamu ketik akan dikirim ke semua anggota circle ini secara anonim.
+
+💡 Gunakan /leave_circle atau klik tombol di bawah untuk keluar.
+
+<i>Mulai ngobrol sekarang...</i>`, room.Name)
+
+		b.sendMessageHTML(telegramID, text, &kb)
+
+	case "create":
+		deleteMsg := tgbotapi.NewDeleteMessage(telegramID, callback.Message.MessageID)
+		b.api.Send(deleteMsg)
+
+		b.db.SetUserState(telegramID, models.StateAwaitingRoomName, "")
+		b.sendMessage(telegramID, "➕ *Buat Circle Baru*\n\nTuliskan *Nama Circle* yang ingin kamu buat:\n(Contoh: Pejuang Kopi PNJ)\n\n_Ketik /cancel untuk membatalkan_", nil)
+
+	case "leave":
+		deleteMsg := tgbotapi.NewDeleteMessage(telegramID, callback.Message.MessageID)
+		b.api.Send(deleteMsg)
+		b.handleLeaveCircle(&tgbotapi.Message{From: &tgbotapi.User{ID: telegramID}})
+
+	case "leave_next":
+		deleteMsg := tgbotapi.NewDeleteMessage(telegramID, callback.Message.MessageID)
+		b.api.Send(deleteMsg)
+
+		b.room.LeaveRoom(telegramID)
+		b.sendMessageHTML(telegramID, "👋 <b>Kamu telah keluar dari circle.</b>\n⏭️ <i>Mencari partner baru...</i>", nil)
+
+		b.startSearch(telegramID, "", "", 0)
+
+	case "stay":
+		deleteMsg := tgbotapi.NewDeleteMessage(telegramID, callback.Message.MessageID)
+		b.api.Send(deleteMsg)
+		b.answerCallback(callback.ID, "👌 Oke, kamu tetap di circle.")
 	}
 }

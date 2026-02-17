@@ -25,6 +25,7 @@ type Bot struct {
 	chat       *service.ChatService
 	confession *service.ConfessionService
 	profile    *service.ProfileService
+	room       *service.RoomService
 	startedAt  time.Time
 }
 
@@ -46,6 +47,7 @@ func New(cfg *config.Config, db *database.DB) (*Bot, error) {
 		chat:       service.NewChatService(db),
 		confession: service.NewConfessionService(db, cfg),
 		profile:    service.NewProfileService(db, cfg),
+		room:       service.NewRoomService(db),
 		startedAt:  time.Now(),
 	}
 
@@ -181,6 +183,7 @@ func (b *Bot) Start() {
 		{Command: "polls", Description: "📊 Lihat daftar polling"},
 		{Command: "vote_poll", Description: "🗳️ Ikut memilih polling (contoh: /vote_poll 1)"},
 		{Command: "whisper", Description: "📢 Kirim whisper ke jurusan"},
+		{Command: "circles", Description: "👥 Gabung Group Circle Anonim"},
 		{Command: "profile", Description: "👤 Lihat profil kamu"},
 		{Command: "stats", Description: "📊 Statistik kamu"},
 		{Command: "edit", Description: "✏️ Edit profil"},
@@ -285,6 +288,10 @@ func (b *Bot) handleCommand(msg *tgbotapi.Message) {
 			b.handleReport(msg)
 		case "block":
 			b.handleBlock(msg)
+		case "circles":
+			b.handleCircles(msg)
+		case "leave_circle":
+			b.handleLeaveCircle(msg)
 		default:
 			b.sendMessage(telegramID, "❓ Perintah tidak dikenali. Ketik /help untuk bantuan.", nil)
 		}
@@ -313,6 +320,12 @@ func (b *Bot) handleMessage(msg *tgbotapi.Message) {
 		b.handleReportInput(msg)
 	case models.StateAwaitingWhisper:
 		b.handleWhisperInput(msg, stateData)
+	case models.StateInCircle:
+		b.handleCircleMessage(msg)
+	case models.StateAwaitingRoomName:
+		b.handleRoomNameInput(msg)
+	case models.StateAwaitingRoomDesc:
+		b.handleRoomDescInput(msg)
 	default:
 
 		if msg.Text != "" {

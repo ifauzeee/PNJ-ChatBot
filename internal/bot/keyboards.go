@@ -157,6 +157,9 @@ func MainMenuKeyboard() tgbotapi.InlineKeyboardMarkup {
 		),
 		tgbotapi.NewInlineKeyboardRow(
 			tgbotapi.NewInlineKeyboardButtonData("📢 Whisper", "menu:whisper"),
+			tgbotapi.NewInlineKeyboardButtonData("👥 Circles", "menu:circles"),
+		),
+		tgbotapi.NewInlineKeyboardRow(
 			tgbotapi.NewInlineKeyboardButtonData("📋 Confessions", "menu:confessions"),
 		),
 		tgbotapi.NewInlineKeyboardRow(
@@ -273,6 +276,35 @@ func LegalAgreementKeyboard() tgbotapi.InlineKeyboardMarkup {
 	return tgbotapi.NewInlineKeyboardMarkup(
 		tgbotapi.NewInlineKeyboardRow(
 			tgbotapi.NewInlineKeyboardButtonData("✅ Saya Setuju", "legal:agree"),
+		),
+	)
+}
+
+func RoomsKeyboard(rooms []*models.Room) tgbotapi.InlineKeyboardMarkup {
+	var rows [][]tgbotapi.InlineKeyboardButton
+	for _, r := range rooms {
+		btn := tgbotapi.NewInlineKeyboardButtonData(
+			fmt.Sprintf("%s (%d members)", r.Name, r.MemberCount),
+			fmt.Sprintf("circle:join:%s", r.Slug),
+		)
+		rows = append(rows, tgbotapi.NewInlineKeyboardRow(btn))
+	}
+
+	rows = append(rows, tgbotapi.NewInlineKeyboardRow(
+		tgbotapi.NewInlineKeyboardButtonData("➕ Buat Circle Baru", "circle:create"),
+	))
+
+	rows = append(rows, tgbotapi.NewInlineKeyboardRow(
+		tgbotapi.NewInlineKeyboardButtonData("🔙 Kembali", "menu:main"),
+	))
+
+	return tgbotapi.NewInlineKeyboardMarkup(rows...)
+}
+
+func LeaveCircleKeyboard() tgbotapi.InlineKeyboardMarkup {
+	return tgbotapi.NewInlineKeyboardMarkup(
+		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData("👋 Keluar Circle", "circle:leave"),
 		),
 	)
 }

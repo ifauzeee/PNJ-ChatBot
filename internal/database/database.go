@@ -207,6 +207,24 @@ func (d *DB) migrate() error {
 			started_at DATETIME DEFAULT CURRENT_TIMESTAMP
 		)`,
 
+		`CREATE TABLE IF NOT EXISTS rooms (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			slug TEXT UNIQUE NOT NULL,
+			name TEXT NOT NULL,
+			description TEXT DEFAULT '',
+			is_active BOOLEAN DEFAULT TRUE,
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+		)`,
+		`CREATE TABLE IF NOT EXISTS room_members (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			room_id INTEGER NOT NULL,
+			telegram_id INTEGER NOT NULL,
+			joined_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			UNIQUE(room_id, telegram_id),
+			FOREIGN KEY (room_id) REFERENCES rooms(id) ON DELETE CASCADE,
+			FOREIGN KEY (telegram_id) REFERENCES users(telegram_id)
+		)`,
+
 		`CREATE INDEX IF NOT EXISTS idx_users_telegram_id ON users(telegram_id)`,
 		`CREATE INDEX IF NOT EXISTS idx_users_department ON users(department)`,
 		`CREATE INDEX IF NOT EXISTS idx_chat_sessions_active ON chat_sessions(is_active)`,
