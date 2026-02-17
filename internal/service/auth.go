@@ -13,13 +13,17 @@ import (
 	"go.uber.org/zap"
 )
 
+type EmailSender interface {
+	SendOTP(to, code string) error
+}
+
 type AuthService struct {
 	db    *database.DB
-	email *email.Sender
+	email EmailSender
 	cfg   *config.Config
 }
 
-func NewAuthService(db *database.DB, emailSender *email.Sender, cfg *config.Config) *AuthService {
+func NewAuthService(db *database.DB, emailSender EmailSender, cfg *config.Config) *AuthService {
 	return &AuthService{
 		db:    db,
 		email: emailSender,

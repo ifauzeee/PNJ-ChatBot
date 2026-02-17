@@ -65,17 +65,18 @@ func (d *DB) UpdateDailyStreak(telegramID int64) (newStreak int, streakBonus boo
 		return 0, false, err
 	}
 
-	now := time.Now()
+	now := time.Now().UTC()
 	yesterday := now.AddDate(0, 0, -1)
 
-	if lastActive.Year() == now.Year() && lastActive.YearDay() == now.YearDay() {
+	lastActiveUTC := lastActive.UTC()
+	if currentStreak > 0 && lastActiveUTC.Year() == now.Year() && lastActiveUTC.YearDay() == now.YearDay() {
 		return currentStreak, false, nil
 	}
 
 	newStreak = 1
 	streakBonus = false
 
-	if lastActive.Year() == yesterday.Year() && lastActive.YearDay() == yesterday.YearDay() {
+	if lastActiveUTC.Year() == yesterday.Year() && lastActiveUTC.YearDay() == yesterday.YearDay() {
 		newStreak = currentStreak + 1
 		streakBonus = true
 	}

@@ -112,8 +112,8 @@ func (s *ChatService) SearchPartner(telegramID int64, preferredDept, preferredGe
 
 func (s *ChatService) isMatch(item QueueItem, prefDept, prefGender string, prefYear int) bool {
 
-	user, _ := s.db.GetUser(item.TelegramID)
-	if user == nil {
+	user, err := s.db.GetUser(item.TelegramID)
+	if err != nil || user == nil {
 		return false
 	}
 	if user.IsBanned {

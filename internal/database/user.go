@@ -32,7 +32,8 @@ func (d *DB) GetUser(telegramID int64) (*models.User, error) {
 	query, args, err := d.Builder.Select(
 		"id", "telegram_id", "email", "gender", "department", "year",
 		"display_name", "karma", "is_verified", "is_banned",
-		"report_count", "total_chats", "created_at", "updated_at",
+		"report_count", "total_chats", "level", "points", "exp",
+		"daily_streak", "last_active_at", "created_at", "updated_at",
 	).From("users").Where("telegram_id = ?", telegramID).ToSql()
 
 	if err != nil {

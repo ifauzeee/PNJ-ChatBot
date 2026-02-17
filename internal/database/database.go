@@ -47,8 +47,12 @@ func New() (*DB, error) {
 		return nil, fmt.Errorf("failed to connect to database: %w", err)
 	}
 
-	db.SetMaxOpenConns(25)
-	db.SetMaxIdleConns(5)
+	if dbType == "postgres" {
+		db.SetMaxOpenConns(100)
+	} else {
+		db.SetMaxOpenConns(25)
+	}
+	db.SetMaxIdleConns(10)
 	db.SetConnMaxLifetime(time.Hour)
 
 	if dbType == "sqlite" {
