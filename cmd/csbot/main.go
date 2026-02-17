@@ -16,7 +16,7 @@ func main() {
 		return
 	}
 
-	db, err := database.New(cfg.DBPath)
+	db, err := database.New()
 	if err != nil {
 		log.Fatalf("❌ Failed to connect to database: %v", err)
 	}

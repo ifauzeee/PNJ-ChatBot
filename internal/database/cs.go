@@ -7,10 +7,8 @@ import (
 )
 
 func (d *DB) SaveCSMessage(adminMessageID int, userID int64) error {
-	_, err := d.Exec(
-		`INSERT INTO cs_messages (admin_message_id, user_id) VALUES (?, ?)`,
-		adminMessageID, userID,
-	)
+	query := d.PrepareQuery(`INSERT INTO cs_messages (admin_message_id, user_id) VALUES (?, ?)`)
+	_, err := d.Exec(query, adminMessageID, userID)
 	return err
 }
 

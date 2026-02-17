@@ -1,0 +1,7 @@
+global:
+  scrape_interval: 15s
+
+scrape_configs:
+  - job_name: 'pnj-bot'
+    static_configs:
+      - targets: ['pnj-bot:8080']

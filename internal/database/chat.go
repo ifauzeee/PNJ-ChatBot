@@ -110,15 +110,16 @@ func (d *DB) GetQueueCount() (int, error) {
 }
 
 func (d *DB) CreateChatSession(user1ID, user2ID int64) (*models.ChatSession, error) {
-	result, err := d.Exec(
+	now := time.Now()
+	id, err := d.InsertGetID(
 		`INSERT INTO chat_sessions (user1_id, user2_id, is_active, started_at) VALUES (?, ?, TRUE, ?)`,
-		user1ID, user2ID, time.Now(),
+		"id",
+		user1ID, user2ID, now,
 	)
+
 	if err != nil {
 		return nil, fmt.Errorf("failed to create chat session: %w", err)
 	}
-
-	id, _ := result.LastInsertId()
 
 	d.IncrementTotalChats(user1ID)
 	d.IncrementTotalChats(user2ID)
@@ -128,7 +129,7 @@ func (d *DB) CreateChatSession(user1ID, user2ID int64) (*models.ChatSession, err
 		User1ID:   user1ID,
 		User2ID:   user2ID,
 		IsActive:  true,
-		StartedAt: time.Now(),
+		StartedAt: now,
 	}, nil
 }
 

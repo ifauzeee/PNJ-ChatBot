@@ -15,19 +15,21 @@ func (d *DB) CreatePoll(authorID int64, question string, options []string) (int6
 	}
 	defer tx.Rollback()
 
-	result, err := tx.Exec(
-		`INSERT INTO polls (author_id, question, created_at) VALUES (?, ?, ?)`,
-		authorID, question, time.Now(),
-	)
-	if err != nil {
-		return 0, fmt.Errorf("failed to create poll: %w", err)
+	var pollID int64
+	query := d.PrepareQuery(`INSERT INTO polls (author_id, question, created_at) VALUES (?, ?, ?)`)
+	if d.DBType == "postgres" {
+		err = tx.QueryRow(query+" RETURNING id", authorID, question, time.Now()).Scan(&pollID)
+	} else {
+		res, errExec := tx.Exec(query, authorID, question, time.Now())
+		if errExec == nil {
+			pollID, _ = res.LastInsertId()
+		}
+		err = errExec
 	}
-
-	pollID, _ := result.LastInsertId()
 
 	for _, opt := range options {
 		_, err := tx.Exec(
-			`INSERT INTO poll_options (poll_id, option_text) VALUES (?, ?)`,
+			d.PrepareQuery(`INSERT INTO poll_options (poll_id, option_text) VALUES (?, ?)`),
 			pollID, opt,
 		)
 		if err != nil {
@@ -118,7 +120,7 @@ func (d *DB) VotePoll(pollID, telegramID, optionID int64) error {
 	defer tx.Rollback()
 
 	var exists bool
-	err = tx.QueryRow(`SELECT EXISTS(SELECT 1 FROM poll_votes WHERE poll_id = ? AND telegram_id = ?)`, pollID, telegramID).Scan(&exists)
+	err = tx.QueryRow(d.PrepareQuery(`SELECT EXISTS(SELECT 1 FROM poll_votes WHERE poll_id = ? AND telegram_id = ?)`), pollID, telegramID).Scan(&exists)
 	if err != nil {
 		return err
 	}
@@ -127,7 +129,7 @@ func (d *DB) VotePoll(pollID, telegramID, optionID int64) error {
 	}
 
 	var optExists bool
-	err = tx.QueryRow(`SELECT EXISTS(SELECT 1 FROM poll_options WHERE id = ? AND poll_id = ?)`, optionID, pollID).Scan(&optExists)
+	err = tx.QueryRow(d.PrepareQuery(`SELECT EXISTS(SELECT 1 FROM poll_options WHERE id = ? AND poll_id = ?)`), optionID, pollID).Scan(&optExists)
 	if err != nil {
 		return err
 	}
@@ -136,14 +138,14 @@ func (d *DB) VotePoll(pollID, telegramID, optionID int64) error {
 	}
 
 	_, err = tx.Exec(
-		`INSERT INTO poll_votes (poll_id, telegram_id, option_id, created_at) VALUES (?, ?, ?, ?)`,
+		d.PrepareQuery(`INSERT INTO poll_votes (poll_id, telegram_id, option_id, created_at) VALUES (?, ?, ?, ?)`),
 		pollID, telegramID, optionID, time.Now(),
 	)
 	if err != nil {
 		return err
 	}
 
-	_, err = tx.Exec(`UPDATE poll_options SET vote_count = vote_count + 1 WHERE id = ?`, optionID)
+	_, err = tx.Exec(d.PrepareQuery(`UPDATE poll_options SET vote_count = vote_count + 1 WHERE id = ?`), optionID)
 	if err != nil {
 		return err
 	}

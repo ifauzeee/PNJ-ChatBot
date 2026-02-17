@@ -1,6 +1,7 @@
 package service
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 
@@ -8,16 +9,26 @@ import (
 	"github.com/pnj-anonymous-bot/internal/models"
 )
 
-type ChatService struct {
-	db *database.DB
+type QueueItem struct {
+	TelegramID int64  `json:"telegram_id"`
+	Dept       string `json:"dept"`
+	Gender     string `json:"gender"`
+	Year       int    `json:"year"`
 }
 
-func NewChatService(db *database.DB) *ChatService {
-	return &ChatService{db: db}
+type ChatService struct {
+	db    *database.DB
+	redis *RedisService
+}
+
+func NewChatService(db *database.DB, redis *RedisService) *ChatService {
+	return &ChatService{
+		db:    db,
+		redis: redis,
+	}
 }
 
 func (s *ChatService) SearchPartner(telegramID int64, preferredDept, preferredGender string, preferredYear int) (int64, error) {
-
 	session, err := s.db.GetActiveSession(telegramID)
 	if err != nil {
 		return 0, fmt.Errorf("gagal memeriksa sesi: %w", err)
@@ -26,65 +37,70 @@ func (s *ChatService) SearchPartner(telegramID int64, preferredDept, preferredGe
 		return 0, fmt.Errorf("kamu masih dalam sesi chat. Gunakan /stop untuk menghentikan chat saat ini")
 	}
 
-	inQueue, err := s.db.IsInQueue(telegramID)
-	if err != nil {
-		return 0, err
-	}
-	if inQueue {
-		return 0, fmt.Errorf("kamu sudah dalam antrian pencarian. Tunggu sebentar ya!")
-	}
+	queueKey := "chat_queue"
+	items, _ := s.redis.client.LRange(s.redis.ctx, queueKey, 0, -1).Result()
 
-	matchID, err := s.db.FindMatch(telegramID, preferredDept, preferredGender, preferredYear)
-	if err != nil {
-		return 0, fmt.Errorf("gagal mencari partner: %w", err)
-	}
+	for _, raw := range items {
+		var item QueueItem
+		json.Unmarshal([]byte(raw), &item)
 
-	if matchID > 0 {
-
-		s.db.RemoveFromQueue(matchID)
-		s.db.RemoveFromQueue(telegramID)
-
-		_, err := s.db.CreateChatSession(telegramID, matchID)
-		if err != nil {
-			return 0, fmt.Errorf("gagal membuat sesi chat: %w", err)
+		if item.TelegramID == telegramID {
+			return 0, fmt.Errorf("kamu sudah dalam antrian pencarian.")
 		}
 
-		s.db.SetUserState(telegramID, models.StateInChat, "")
-		s.db.SetUserState(matchID, models.StateInChat, "")
+		if s.isMatch(item, preferredDept, preferredGender, preferredYear) {
 
-		log.Printf("💬 Chat matched: %d <-> %d", telegramID, matchID)
-		return matchID, nil
-	}
+			s.redis.client.LRem(s.redis.ctx, queueKey, 1, raw)
 
-	if err := s.db.AddToQueue(telegramID, preferredDept, preferredGender, preferredYear); err != nil {
-		return 0, fmt.Errorf("gagal menambahkan ke antrian: %w", err)
-	}
+			_, err := s.db.CreateChatSession(telegramID, item.TelegramID)
+			if err != nil {
+				return 0, err
+			}
 
-	stateData := preferredDept
-	if preferredGender != "" {
-		if stateData != "" {
-			stateData += "|" + preferredGender
-		} else {
-			stateData = preferredGender
-		}
-	}
-	if preferredYear != 0 {
-		yearStr := fmt.Sprintf("%d", preferredYear)
-		if stateData != "" {
-			stateData += "|" + yearStr
-		} else {
-			stateData = yearStr
+			s.db.SetUserState(telegramID, models.StateInChat, "")
+			s.db.SetUserState(item.TelegramID, models.StateInChat, "")
+
+			log.Printf("💬 Chat matched (Redis): %d <-> %d", telegramID, item.TelegramID)
+			return item.TelegramID, nil
 		}
 	}
 
-	s.db.SetUserState(telegramID, models.StateSearching, stateData)
-	log.Printf("🔍 User %d added to queue (dept: %s, gender: %s, year: %d)", telegramID, preferredDept, preferredGender, preferredYear)
+	newItem := QueueItem{
+		TelegramID: telegramID,
+		Dept:       preferredDept,
+		Gender:     preferredGender,
+		Year:       preferredYear,
+	}
+	raw, _ := json.Marshal(newItem)
+	s.redis.client.RPush(s.redis.ctx, queueKey, raw)
+
+	s.db.SetUserState(telegramID, models.StateSearching, "")
+	log.Printf("🔍 User %d added to queue (Redis)", telegramID)
 	return 0, nil
 }
 
-func (s *ChatService) StopChat(telegramID int64) (int64, error) {
+func (s *ChatService) isMatch(item QueueItem, prefDept, prefGender string, prefYear int) bool {
 
-	s.db.RemoveFromQueue(telegramID)
+	user, _ := s.db.GetUser(item.TelegramID)
+	if user == nil {
+		return false
+	}
+
+	if prefDept != "" && string(user.Department) != prefDept {
+		return false
+	}
+	if prefGender != "" && string(user.Gender) != prefGender {
+		return false
+	}
+	if prefYear != 0 && user.Year != prefYear {
+		return false
+	}
+
+	return true
+}
+
+func (s *ChatService) StopChat(telegramID int64) (int64, error) {
+	s.redis.RemoveFromQueue(telegramID)
 
 	session, err := s.db.GetActiveSession(telegramID)
 	if err != nil {
@@ -103,12 +119,10 @@ func (s *ChatService) StopChat(telegramID int64) (int64, error) {
 	s.db.SetUserState(telegramID, models.StateNone, "")
 	s.db.SetUserState(partnerID, models.StateNone, "")
 
-	log.Printf("🛑 Chat ended: %d <-> %d", telegramID, partnerID)
 	return partnerID, nil
 }
 
 func (s *ChatService) NextPartner(telegramID int64) (int64, error) {
-
 	partnerID, err := s.StopChat(telegramID)
 	if err != nil {
 		return 0, err
@@ -129,30 +143,17 @@ func (s *ChatService) GetPartnerInfo(partnerID int64) (string, string, int, erro
 }
 
 func (s *ChatService) GetQueueCount() (int, error) {
-	return s.db.GetQueueCount()
+	count, err := s.redis.client.LLen(s.redis.ctx, "chat_queue").Result()
+	return int(count), err
 }
 
 func (s *ChatService) CancelSearch(telegramID int64) error {
-	s.db.RemoveFromQueue(telegramID)
+	s.redis.RemoveFromQueue(telegramID)
 	s.db.SetUserState(telegramID, models.StateNone, "")
 	return nil
 }
 
 func (s *ChatService) ProcessQueueTimeout(timeoutSeconds int) ([]int64, error) {
-	items, err := s.db.GetExpiredQueueItems(timeoutSeconds)
-	if err != nil {
-		return nil, err
-	}
 
-	var updatedIDs []int64
-	for _, item := range items {
-		if err := s.db.ClearQueueFilters(item.TelegramID); err != nil {
-			log.Printf("Error clearing filters for %d: %v", item.TelegramID, err)
-			continue
-		}
-		s.db.SetUserState(item.TelegramID, models.StateSearching, "")
-		updatedIDs = append(updatedIDs, item.TelegramID)
-	}
-
-	return updatedIDs, nil
+	return nil, nil
 }

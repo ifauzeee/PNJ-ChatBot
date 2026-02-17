@@ -89,15 +89,12 @@ func (d *DB) VerifyCode(telegramID int64, code string) (string, bool, error) {
 }
 
 func (d *DB) CreateWhisper(senderID int64, targetDept, content, senderDept, senderGender string) (int64, error) {
-	result, err := d.Exec(
+	return d.InsertGetID(
 		`INSERT INTO whispers (sender_id, target_dept, content, sender_dept, sender_gender, created_at) 
 		 VALUES (?, ?, ?, ?, ?, ?)`,
+		"id",
 		senderID, targetDept, content, senderDept, senderGender, time.Now(),
 	)
-	if err != nil {
-		return 0, err
-	}
-	return result.LastInsertId()
 }
 
 func (d *DB) GetUserStats(telegramID int64) (totalChats int, totalConfessions int, totalReactions int, daysSinceJoined int, err error) {

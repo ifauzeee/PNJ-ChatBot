@@ -14,7 +14,6 @@ import (
 func main() {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 
-
 	banner := `
 ╔══════════════════════════════════════════════════╗
 ║                                                  ║
@@ -29,25 +28,21 @@ func main() {
 `
 	log.Println(banner)
 
-
 	log.Println("📋 Loading configuration...")
 	cfg := config.Load()
 
-
 	log.Println("🗄️  Initializing database...")
-	db, err := database.New(cfg.DBPath)
+	db, err := database.New()
 	if err != nil {
 		log.Fatalf("❌ Failed to initialize database: %v", err)
 	}
 	defer db.Close()
-
 
 	log.Println("🤖 Creating bot instance...")
 	b, err := bot.New(cfg, db)
 	if err != nil {
 		log.Fatalf("❌ Failed to create bot: %v", err)
 	}
-
 
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
@@ -58,7 +53,6 @@ func main() {
 		db.Close()
 		os.Exit(0)
 	}()
-
 
 	b.Start()
 }

@@ -13,6 +13,7 @@ import (
 	"github.com/pnj-anonymous-bot/internal/email"
 	"github.com/pnj-anonymous-bot/internal/models"
 	"github.com/pnj-anonymous-bot/internal/service"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
@@ -38,13 +39,14 @@ func New(cfg *config.Config, db *database.DB) (*Bot, error) {
 	api.Debug = cfg.BotDebug
 
 	emailSender := email.NewSender(cfg)
+	redisSvc := service.NewRedisService()
 
 	bot := &Bot{
 		api:        api,
 		cfg:        cfg,
 		db:         db,
 		auth:       service.NewAuthService(db, emailSender, cfg),
-		chat:       service.NewChatService(db),
+		chat:       service.NewChatService(db, redisSvc),
 		confession: service.NewConfessionService(db, cfg),
 		profile:    service.NewProfileService(db, cfg),
 		room:       service.NewRoomService(db),
@@ -106,25 +108,7 @@ func (b *Bot) startHealthServer() {
 		fmt.Fprint(w, `{"status":"ready"}`)
 	})
 
-	mux.HandleFunc("/metrics", func(w http.ResponseWriter, r *http.Request) {
-		var memStats runtime.MemStats
-		runtime.ReadMemStats(&memStats)
-
-		userCount, _ := b.db.GetOnlineUserCount()
-		queueCount, _ := b.chat.GetQueueCount()
-
-		w.Header().Set("Content-Type", "text/plain")
-		fmt.Fprintf(w, "# HELP pnj_bot_uptime_seconds Bot uptime in seconds\n")
-		fmt.Fprintf(w, "pnj_bot_uptime_seconds %.0f\n", time.Since(b.startedAt).Seconds())
-		fmt.Fprintf(w, "# HELP pnj_bot_goroutines Number of goroutines\n")
-		fmt.Fprintf(w, "pnj_bot_goroutines %d\n", runtime.NumGoroutine())
-		fmt.Fprintf(w, "# HELP pnj_bot_memory_bytes Memory usage in bytes\n")
-		fmt.Fprintf(w, "pnj_bot_memory_bytes %d\n", memStats.Alloc)
-		fmt.Fprintf(w, "# HELP pnj_bot_registered_users Total registered users\n")
-		fmt.Fprintf(w, "pnj_bot_registered_users %d\n", userCount)
-		fmt.Fprintf(w, "# HELP pnj_bot_queue_size Current search queue size\n")
-		fmt.Fprintf(w, "pnj_bot_queue_size %d\n", queueCount)
-	})
+	mux.Handle("/metrics", promhttp.Handler())
 
 	server := &http.Server{
 		Addr:         ":8080",

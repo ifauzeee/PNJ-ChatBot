@@ -9,22 +9,23 @@ import (
 )
 
 func (d *DB) CreateConfession(authorID int64, content, department string) (*models.Confession, error) {
-	result, err := d.Exec(
+	now := time.Now()
+	id, err := d.InsertGetID(
 		`INSERT INTO confessions (author_id, content, department, created_at) VALUES (?, ?, ?, ?)`,
-		authorID, content, department, time.Now(),
+		"id",
+		authorID, content, department, now,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create confession: %w", err)
 	}
 
-	id, _ := result.LastInsertId()
 	return &models.Confession{
 		ID:         id,
 		AuthorID:   authorID,
 		Content:    content,
 		Department: department,
 		LikeCount:  0,
-		CreatedAt:  time.Now(),
+		CreatedAt:  now,
 	}, nil
 }
 
