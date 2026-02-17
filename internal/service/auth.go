@@ -42,7 +42,7 @@ func (s *AuthService) InitiateVerification(telegramID int64, emailAddr string) e
 	emailAddr = strings.ToLower(strings.TrimSpace(emailAddr))
 
 	if !email.IsValidPNJEmail(emailAddr) {
-		return fmt.Errorf("email harus menggunakan domain @mhsw.pnj.ac.id atau @pnj.ac.id")
+		return fmt.Errorf("email harus menggunakan domain @mhsw.pnj.ac.id atau @stu.pnj.ac.id")
 	}
 
 	code := email.GenerateOTP(s.cfg.OTPLength)

@@ -97,7 +97,7 @@ func IsValidPNJEmail(emailAddr string) bool {
 
 	validDomains := []string{
 		"@mhsw.pnj.ac.id",
-		"@pnj.ac.id",
+		"@stu.pnj.ac.id",
 	}
 
 	for _, domain := range validDomains {

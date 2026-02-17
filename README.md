@@ -9,7 +9,7 @@
 ## ✨ Fitur
 
 ### 🔐 Verifikasi Email
-- Khusus domain `@mhsw.pnj.ac.id` dan `@pnj.ac.id`
+- Khusus domain `@mhsw.pnj.ac.id` dan `@stu.pnj.ac.id`
 - OTP 6-digit via email dengan template HTML premium
 - Anti-duplikat email
 

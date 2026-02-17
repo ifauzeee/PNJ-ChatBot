@@ -75,7 +75,7 @@ Contoh: _nama@mhsw.pnj.ac.id_
 
 Domain yang diterima:
 • @mhsw.pnj.ac.id (Mahasiswa)
-• @pnj.ac.id (Dosen/Staff)`
+• @stu.pnj.ac.id (Dosen/Staff)`
 
 	b.db.SetUserState(telegramID, models.StateAwaitingEmail, "")
 	b.sendMessage(telegramID, registText, nil)
