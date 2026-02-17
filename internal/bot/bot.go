@@ -178,7 +178,8 @@ func (b *Bot) Start() {
 		{Command: "reply", Description: "Balas confession (contoh: /reply 1 Hallo!)"},
 		{Command: "view_replies", Description: "Lihat balasan confession (contoh: /view_replies 1)"},
 		{Command: "poll", Description: "🗳️ Buat polling anonim"},
-		{Command: "polls", Description: "📊 Lihat polling terbaru"},
+		{Command: "polls", Description: "📊 Lihat daftar polling"},
+		{Command: "vote_poll", Description: "🗳️ Ikut memilih polling (contoh: /vote_poll 1)"},
 		{Command: "whisper", Description: "📢 Kirim whisper ke jurusan"},
 		{Command: "profile", Description: "👤 Lihat profil kamu"},
 		{Command: "stats", Description: "📊 Statistik kamu"},
@@ -267,6 +268,8 @@ func (b *Bot) handleCommand(msg *tgbotapi.Message) {
 			b.handlePoll(msg)
 		case "polls":
 			b.handleViewPolls(msg)
+		case "vote_poll":
+			b.handleVotePoll(msg)
 		case "whisper":
 			b.handleWhisper(msg)
 		case "profile":
