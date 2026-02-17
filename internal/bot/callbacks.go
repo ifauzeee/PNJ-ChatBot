@@ -435,14 +435,17 @@ func (b *Bot) handleCircleCallback(telegramID int64, data string, callback *tgbo
 		if len(parts) < 2 {
 			return
 		}
+		slug := parts[1]
 
 		state, _, _ := b.db.GetUserState(telegramID)
 		if state == models.StateInChat {
-			b.answerCallback(callback.ID, "⚠️ Akhiri chat aktif kamu dulu (/stop) sebelum gabung ke circle.")
+			kb := ConfirmKeyboard(fmt.Sprintf("circle:confirm_join:%s", slug), "circle:stay_chat")
+			b.sendMessageHTML(telegramID, `⚠️ <b>Kamu sedang dalam Private Chat aktif</b>
+
+Bergabung ke circle akan mengakhiri chat kamu saat ini secara otomatis. Apakah kamu yakin?`, &kb)
 			return
 		}
 
-		slug := parts[1]
 		room, err := b.room.JoinRoom(telegramID, slug)
 		if err != nil {
 			b.answerCallback(callback.ID, "❌ "+err.Error())
@@ -470,6 +473,40 @@ Sekarang semua pesan yang kamu ketik akan dikirim ke semua anggota circle ini se
 
 		b.db.SetUserState(telegramID, models.StateAwaitingRoomName, "")
 		b.sendMessage(telegramID, "➕ *Buat Circle Baru*\n\nTuliskan *Nama Circle* yang ingin kamu buat:\n(Contoh: Pejuang Kopi PNJ)\n\n_Ketik /cancel untuk membatalkan_", nil)
+
+	case "confirm_join":
+		if len(parts) < 2 {
+			return
+		}
+		slug := parts[1]
+
+		deleteMsg := tgbotapi.NewDeleteMessage(telegramID, callback.Message.MessageID)
+		b.api.Send(deleteMsg)
+
+		partnerID, _ := b.chat.StopChat(telegramID)
+		if partnerID > 0 {
+			b.sendMessage(partnerID, "👋 *Partner kamu telah memutus chat.*", nil)
+		}
+
+		room, err := b.room.JoinRoom(telegramID, slug)
+		if err != nil {
+			b.sendMessage(telegramID, "❌ "+err.Error(), nil)
+			return
+		}
+
+		kb := LeaveCircleKeyboard()
+		text := fmt.Sprintf(`🎉 <b>Berhasil Terhubung ke Circle %s</b>
+
+━━━━━━━━━━━━━━━━━━━
+Pesan kamu sekarang dikirim ke circle ini. Private chat sebelumnya telah dihentikan.
+
+<i>Mulai ngobrol sekarang...</i>`, room.Name)
+		b.sendMessageHTML(telegramID, text, &kb)
+
+	case "stay_chat":
+		deleteMsg := tgbotapi.NewDeleteMessage(telegramID, callback.Message.MessageID)
+		b.api.Send(deleteMsg)
+		b.answerCallback(callback.ID, "👌 Oke, private chat dilanjutkan.")
 
 	case "leave":
 		deleteMsg := tgbotapi.NewDeleteMessage(telegramID, callback.Message.MessageID)
