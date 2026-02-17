@@ -196,6 +196,16 @@ func (d *DB) migrate() error {
 			user_id INTEGER NOT NULL,
 			created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 		)`,
+		`CREATE TABLE IF NOT EXISTS cs_queue (
+			user_id INTEGER PRIMARY KEY,
+			joined_at DATETIME DEFAULT CURRENT_TIMESTAMP
+		)`,
+		`CREATE TABLE IF NOT EXISTS cs_sessions (
+			user_id INTEGER PRIMARY KEY,
+			admin_id INTEGER NOT NULL,
+			last_activity DATETIME DEFAULT CURRENT_TIMESTAMP,
+			started_at DATETIME DEFAULT CURRENT_TIMESTAMP
+		)`,
 
 		`CREATE INDEX IF NOT EXISTS idx_users_telegram_id ON users(telegram_id)`,
 		`CREATE INDEX IF NOT EXISTS idx_users_department ON users(department)`,
