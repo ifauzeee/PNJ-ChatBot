@@ -3,6 +3,7 @@ package service
 import (
 	"encoding/json"
 	"fmt"
+	"time"
 
 	"github.com/pnj-anonymous-bot/internal/database"
 	"github.com/pnj-anonymous-bot/internal/logger"
@@ -15,6 +16,7 @@ type QueueItem struct {
 	Dept       string `json:"dept"`
 	Gender     string `json:"gender"`
 	Year       int    `json:"year"`
+	JoinedAt   int64  `json:"joined_at"`
 }
 
 type ChatService struct {
@@ -96,6 +98,7 @@ func (s *ChatService) SearchPartner(telegramID int64, preferredDept, preferredGe
 		Dept:       preferredDept,
 		Gender:     preferredGender,
 		Year:       preferredYear,
+		JoinedAt:   time.Now().Unix(),
 	}
 	raw, _ := json.Marshal(newItem)
 	if err := s.redis.client.RPush(s.redis.ctx, queueKey, raw).Err(); err != nil {
@@ -185,5 +188,61 @@ func (s *ChatService) CancelSearch(telegramID int64) error {
 }
 
 func (s *ChatService) ProcessQueueTimeout(timeoutSeconds int) ([]int64, error) {
-	return nil, nil
+	if timeoutSeconds <= 0 {
+		return nil, nil
+	}
+
+	queueKey := "chat_queue"
+	items, err := s.redis.client.LRange(s.redis.ctx, queueKey, 0, -1).Result()
+	if err != nil {
+		return nil, err
+	}
+
+	now := time.Now().Unix()
+	updatedIDs := make([]int64, 0)
+	invalidItems := make(map[string]struct{})
+
+	for idx, raw := range items {
+		var item QueueItem
+		if err := json.Unmarshal([]byte(raw), &item); err != nil || item.TelegramID == 0 {
+			invalidItems[raw] = struct{}{}
+			continue
+		}
+
+		changed := false
+		if item.JoinedAt <= 0 {
+			item.JoinedAt = now
+			changed = true
+		}
+
+		hasFilter := item.Dept != "" || item.Gender != "" || item.Year != 0
+		if hasFilter && now-item.JoinedAt >= int64(timeoutSeconds) {
+			item.Dept = ""
+			item.Gender = ""
+			item.Year = 0
+			changed = true
+			updatedIDs = append(updatedIDs, item.TelegramID)
+		}
+
+		if !changed {
+			continue
+		}
+
+		updatedRaw, err := json.Marshal(item)
+		if err != nil {
+			continue
+		}
+
+		if err := s.redis.client.LSet(s.redis.ctx, queueKey, int64(idx), updatedRaw).Err(); err != nil {
+			logger.Warn("Failed to update queue item", zap.Int64("user_id", item.TelegramID), zap.Error(err))
+		}
+	}
+
+	for raw := range invalidItems {
+		if err := s.redis.client.LRem(s.redis.ctx, queueKey, 0, raw).Err(); err != nil {
+			logger.Warn("Failed to remove invalid queue item", zap.Error(err))
+		}
+	}
+
+	return updatedIDs, nil
 }

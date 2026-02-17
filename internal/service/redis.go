@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"strings"
@@ -62,6 +63,16 @@ func (r *RedisService) RemoveFromQueue(telegramID int64) error {
 
 	for _, item := range items {
 		if strings.HasPrefix(item, fmt.Sprintf("%d:", telegramID)) {
+			if err := r.client.LRem(r.ctx, key, 0, item).Err(); err != nil {
+				return err
+			}
+			continue
+		}
+
+		var queued struct {
+			TelegramID int64 `json:"telegram_id"`
+		}
+		if err := json.Unmarshal([]byte(item), &queued); err == nil && queued.TelegramID == telegramID {
 			if err := r.client.LRem(r.ctx, key, 0, item).Err(); err != nil {
 				return err
 			}
