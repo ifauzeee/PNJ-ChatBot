@@ -33,7 +33,7 @@ func New(cfg *config.Config, db *database.DB) (*CSBot, error) {
 }
 
 func (b *CSBot) Start() {
-	log.Printf("🛠️ CS Bot authorized as @%s", b.api.Self.UserName)
+	log.Printf("🛠️ CS Bot authorized as @%s (Admin ID: %d)", b.api.Self.UserName, b.cfg.MaintenanceAccountID)
 
 	go b.startTimeoutWorker()
 
@@ -46,6 +46,7 @@ func (b *CSBot) Start() {
 		if update.Message == nil {
 			continue
 		}
+		log.Printf("📥 CS Update from %d: %s", update.Message.From.ID, update.Message.Text)
 		b.handleMessage(update.Message)
 	}
 }
@@ -68,6 +69,29 @@ func (b *CSBot) startTimeoutWorker() {
 func (b *CSBot) handleMessage(msg *tgbotapi.Message) {
 	telegramID := msg.From.ID
 
+	if telegramID == b.cfg.MaintenanceAccountID {
+		userID, _ := b.db.GetActiveCSSessionByAdmin(telegramID)
+		if userID > 0 {
+			b.db.UpdateCSSessionActivity(userID)
+			if msg.IsCommand() && (msg.Command() == "stop" || msg.Command() == "end") {
+				b.handleStop(userID)
+				return
+			}
+			b.handleAdminReply(userID, msg)
+			return
+		}
+
+		if msg.IsCommand() {
+			switch msg.Command() {
+			case "start", "help":
+				b.handleHelp(telegramID)
+			default:
+				b.sendMessage(telegramID, "💡 Kamu adalah Admin. Gunakan /chat pada akun User untuk mencoba, lalu balas dari sini.")
+			}
+		}
+		return
+	}
+
 	adminID, _ := b.db.GetActiveCSSessionByUser(telegramID)
 	if adminID > 0 {
 		b.db.UpdateCSSessionActivity(telegramID)
@@ -79,29 +103,14 @@ func (b *CSBot) handleMessage(msg *tgbotapi.Message) {
 		return
 	}
 
-	if telegramID == b.cfg.MaintenanceAccountID {
-		userID, _ := b.db.GetActiveCSSessionByAdmin(telegramID)
-		if userID > 0 {
-			b.db.UpdateCSSessionActivity(userID)
-			if msg.IsCommand() && msg.Command() == "stop" {
-				b.handleStop(userID)
-				return
-			}
-			b.handleAdminReply(userID, msg)
-			return
-		}
-	}
-
 	if msg.IsCommand() {
 		switch msg.Command() {
 		case "start", "help":
 			b.handleHelp(telegramID)
 		case "chat":
 			b.handleChat(telegramID)
-		case "stop":
-			b.sendMessage(telegramID, "⚠️ Kamu tidak sedang dalam sesi chat.")
 		default:
-			b.sendMessage(telegramID, "❓ Perintah tidak dikenal.")
+			b.sendMessage(telegramID, "❓ Perintah tidak dikenal. Ketik /chat untuk bantuan.")
 		}
 		return
 	}
@@ -140,10 +149,11 @@ func (b *CSBot) handleStop(userID int64) {
 }
 
 func (b *CSBot) startSession(userID int64) {
+	log.Printf("🚀 Starting CS session: User %d with Admin %d", userID, b.cfg.MaintenanceAccountID)
 	b.db.LeaveCSQueue(userID)
 	err := b.db.CreateCSSession(userID, b.cfg.MaintenanceAccountID)
 	if err != nil {
-		log.Printf("Error creating CS session: %v", err)
+		log.Printf("❌ Error creating CS session: %v", err)
 		return
 	}
 
@@ -165,6 +175,7 @@ func (b *CSBot) processQueue() {
 }
 
 func (b *CSBot) forwardToAdmin(userID, adminID int64, msg *tgbotapi.Message) {
+	log.Printf("📲 Forwarding msg from %d to admin %d", userID, adminID)
 	text := fmt.Sprintf("👤 <b>USER %d</b>\n\n%s", userID, msg.Text)
 	b.sendMessage(adminID, text)
 }
@@ -182,5 +193,8 @@ func (b *CSBot) handleAdminReply(userID int64, adminMsg *tgbotapi.Message) {
 func (b *CSBot) sendMessage(chatID int64, text string) {
 	msg := tgbotapi.NewMessage(chatID, text)
 	msg.ParseMode = "HTML"
-	b.api.Send(msg)
+	_, err := b.api.Send(msg)
+	if err != nil {
+		log.Printf("❌ Error sending message to %d: %v", chatID, err)
+	}
 }
