@@ -32,7 +32,7 @@ func (s *ProfileService) SetGender(telegramID int64, gender string) error {
 }
 
 func (s *ProfileService) SetYear(telegramID int64, year int) error {
-	if year < 2018 || year > 2026 {
+	if !models.IsValidEntryYear(year) {
 		return fmt.Errorf("tahun angkatan tidak valid")
 	}
 
@@ -76,7 +76,7 @@ func (s *ProfileService) UpdateGender(telegramID int64, gender string) error {
 }
 
 func (s *ProfileService) UpdateYear(telegramID int64, year int) error {
-	if year < 2018 || year > 2026 {
+	if !models.IsValidEntryYear(year) {
 		return fmt.Errorf("tahun angkatan tidak valid")
 	}
 	return s.db.UpdateUserYear(telegramID, year)

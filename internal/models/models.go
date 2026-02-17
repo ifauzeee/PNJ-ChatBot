@@ -65,6 +65,7 @@ type Gender string
 const (
 	GenderMale   Gender = "Laki-laki"
 	GenderFemale Gender = "Perempuan"
+	MinEntryYear        = 2018
 )
 
 func GenderEmoji(g Gender) string {
@@ -80,6 +81,28 @@ func GenderEmoji(g Gender) string {
 
 func IsValidGender(g string) bool {
 	return g == string(GenderMale) || g == string(GenderFemale)
+}
+
+func CurrentEntryYear() int {
+	return time.Now().Year()
+}
+
+func IsValidEntryYear(year int) bool {
+	return year >= MinEntryYear && year <= CurrentEntryYear()
+}
+
+func AvailableEntryYears() []int {
+	currentYear := CurrentEntryYear()
+	if currentYear < MinEntryYear {
+		return []int{MinEntryYear}
+	}
+
+	years := make([]int, 0, currentYear-MinEntryYear+1)
+	for year := currentYear; year >= MinEntryYear; year-- {
+		years = append(years, year)
+	}
+
+	return years
 }
 
 type User struct {

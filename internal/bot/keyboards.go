@@ -18,7 +18,7 @@ func GenderKeyboard() tgbotapi.InlineKeyboardMarkup {
 }
 
 func YearKeyboard() tgbotapi.InlineKeyboardMarkup {
-	years := []int{2020, 2021, 2022, 2023, 2024, 2025}
+	years := models.AvailableEntryYears()
 	var rows [][]tgbotapi.InlineKeyboardButton
 
 	for i := 0; i < len(years); i += 3 {
@@ -73,7 +73,7 @@ func SearchKeyboard() tgbotapi.InlineKeyboardMarkup {
 }
 
 func SearchYearKeyboard() tgbotapi.InlineKeyboardMarkup {
-	years := []int{2020, 2021, 2022, 2023, 2024, 2025}
+	years := models.AvailableEntryYears()
 	var rows [][]tgbotapi.InlineKeyboardButton
 
 	for i := 0; i < len(years); i += 3 {

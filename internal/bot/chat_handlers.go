@@ -38,7 +38,7 @@ func (b *Bot) handleSearch(msg *tgbotapi.Message) {
 				preferredDept = part
 			} else if part == "Laki-laki" || part == "Perempuan" {
 				preferredGender = part
-			} else if year, err := strconv.Atoi(part); err == nil && year >= 2018 && year <= 2026 {
+			} else if year, err := strconv.Atoi(part); err == nil && models.IsValidEntryYear(year) {
 				preferredYear = year
 			}
 		}
