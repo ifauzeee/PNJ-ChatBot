@@ -34,23 +34,52 @@ func DepartmentKeyboard() tgbotapi.InlineKeyboardMarkup {
 }
 
 func SearchKeyboard() tgbotapi.InlineKeyboardMarkup {
+	return tgbotapi.NewInlineKeyboardMarkup(
+		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData("🎲 Acak", "search:any"),
+		),
+		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData("👫 Berdasarkan Gender", "search:by_gender"),
+		),
+		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData("🏛️ Berdasarkan Jurusan", "search:by_dept"),
+		),
+		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData("🔙 Kembali", "menu:main"),
+		),
+	)
+}
+
+func SearchDepartmentKeyboard() tgbotapi.InlineKeyboardMarkup {
+	depts := models.AllDepartments()
 	var rows [][]tgbotapi.InlineKeyboardButton
 
-	rows = append(rows, tgbotapi.NewInlineKeyboardRow(
-		tgbotapi.NewInlineKeyboardButtonData("🎲 Acak (Semua Jurusan)", "search:any"),
-	))
-
-	depts := models.AllDepartments()
 	for _, dept := range depts {
 		emoji := models.DepartmentEmoji(dept)
 		btn := tgbotapi.NewInlineKeyboardButtonData(
 			fmt.Sprintf("%s %s", emoji, string(dept)),
-			fmt.Sprintf("search:%s", string(dept)),
+			fmt.Sprintf("search:dept:%s", string(dept)),
 		)
 		rows = append(rows, tgbotapi.NewInlineKeyboardRow(btn))
 	}
 
+	rows = append(rows, tgbotapi.NewInlineKeyboardRow(
+		tgbotapi.NewInlineKeyboardButtonData("🔙 Kembali", "menu:search"),
+	))
+
 	return tgbotapi.NewInlineKeyboardMarkup(rows...)
+}
+
+func SearchGenderKeyboard() tgbotapi.InlineKeyboardMarkup {
+	return tgbotapi.NewInlineKeyboardMarkup(
+		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData("👨 Cari Laki-laki", "search:gender:Laki-laki"),
+			tgbotapi.NewInlineKeyboardButtonData("👩 Cari Perempuan", "search:gender:Perempuan"),
+		),
+		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData("🔙 Kembali", "menu:search"),
+		),
+	)
 }
 
 func ChatActionKeyboard() tgbotapi.InlineKeyboardMarkup {

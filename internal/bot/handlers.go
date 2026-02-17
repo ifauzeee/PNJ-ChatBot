@@ -49,7 +49,6 @@ Ketik /regist dan ikuti proses verifikasi email PNJ kamu.`, msg.From.FirstName)
 	}
 
 	b.showMainMenu(telegramID, user)
-	b.showMainMenu(telegramID, user)
 }
 
 func (b *Bot) handleRegist(msg *tgbotapi.Message) {
@@ -198,7 +197,7 @@ func (b *Bot) handleSearch(msg *tgbotapi.Message) {
 
 	args := msg.CommandArguments()
 	if args != "" {
-		b.startSearch(telegramID, args)
+		b.startSearch(telegramID, args, "")
 		return
 	}
 
@@ -206,12 +205,12 @@ func (b *Bot) handleSearch(msg *tgbotapi.Message) {
 	b.sendMessage(telegramID, "🔍 *Cari Partner Chat Anonim*\n\nPilih filter pencarian:", &kb)
 }
 
-func (b *Bot) startSearch(telegramID int64, preferredDept string) {
+func (b *Bot) startSearch(telegramID int64, preferredDept, preferredGender string) {
 	if preferredDept == "any" {
 		preferredDept = ""
 	}
 
-	matchID, err := b.chat.SearchPartner(telegramID, preferredDept)
+	matchID, err := b.chat.SearchPartner(telegramID, preferredDept, preferredGender)
 	if err != nil {
 		b.sendMessage(telegramID, fmt.Sprintf("⚠️ %s", err.Error()), nil)
 		return
@@ -292,7 +291,7 @@ func (b *Bot) handleNext(msg *tgbotapi.Message) {
 	}
 
 	b.sendMessage(telegramID, "⏭️ *Mencari partner baru...*", nil)
-	b.startSearch(telegramID, "")
+	b.startSearch(telegramID, "", "")
 }
 
 func (b *Bot) handleStop(msg *tgbotapi.Message) {

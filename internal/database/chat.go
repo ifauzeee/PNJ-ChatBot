@@ -8,10 +8,10 @@ import (
 	"github.com/pnj-anonymous-bot/internal/models"
 )
 
-func (d *DB) AddToQueue(telegramID int64, preferredDept string) error {
+func (d *DB) AddToQueue(telegramID int64, preferredDept, preferredGender string) error {
 	_, err := d.Exec(
-		`INSERT OR REPLACE INTO chat_queue (telegram_id, preferred_dept, joined_at) VALUES (?, ?, ?)`,
-		telegramID, preferredDept, time.Now(),
+		`INSERT OR REPLACE INTO chat_queue (telegram_id, preferred_dept, preferred_gender, joined_at) VALUES (?, ?, ?, ?)`,
+		telegramID, preferredDept, preferredGender, time.Now(),
 	)
 	return err
 }
@@ -27,41 +27,35 @@ func (d *DB) IsInQueue(telegramID int64) (bool, error) {
 	return count > 0, err
 }
 
-func (d *DB) FindMatch(telegramID int64, preferredDept string) (int64, error) {
+func (d *DB) FindMatch(telegramID int64, preferredDept, preferredGender string) (int64, error) {
 	var matchID int64
 	var query string
 	var args []interface{}
 
+	query = `SELECT cq.telegram_id FROM chat_queue cq
+			 JOIN users u ON cq.telegram_id = u.telegram_id
+			 WHERE cq.telegram_id != ? 
+			 AND u.is_banned = FALSE`
+	args = append(args, telegramID)
+
 	if preferredDept != "" {
-
-		query = `SELECT cq.telegram_id FROM chat_queue cq
-				 JOIN users u ON cq.telegram_id = u.telegram_id
-				 WHERE cq.telegram_id != ? 
-				 AND u.department = ?
-				 AND u.is_banned = FALSE
-				 AND cq.telegram_id NOT IN (
-					 SELECT blocked_id FROM blocked_users WHERE user_id = ?
-					 UNION
-					 SELECT user_id FROM blocked_users WHERE blocked_id = ?
-				 )
-				 ORDER BY cq.joined_at ASC
-				 LIMIT 1`
-		args = []interface{}{telegramID, preferredDept, telegramID, telegramID}
-	} else {
-
-		query = `SELECT cq.telegram_id FROM chat_queue cq
-				 JOIN users u ON cq.telegram_id = u.telegram_id
-				 WHERE cq.telegram_id != ?
-				 AND u.is_banned = FALSE
-				 AND cq.telegram_id NOT IN (
-					 SELECT blocked_id FROM blocked_users WHERE user_id = ?
-					 UNION
-					 SELECT user_id FROM blocked_users WHERE blocked_id = ?
-				 )
-				 ORDER BY cq.joined_at ASC
-				 LIMIT 1`
-		args = []interface{}{telegramID, telegramID, telegramID}
+		query += ` AND u.department = ?`
+		args = append(args, preferredDept)
 	}
+
+	if preferredGender != "" {
+		query += ` AND u.gender = ?`
+		args = append(args, preferredGender)
+	}
+
+	query += ` AND cq.telegram_id NOT IN (
+				 SELECT blocked_id FROM blocked_users WHERE user_id = ?
+				 UNION
+				 SELECT user_id FROM blocked_users WHERE blocked_id = ?
+			 )
+			 ORDER BY cq.joined_at ASC
+			 LIMIT 1`
+	args = append(args, telegramID, telegramID)
 
 	err := d.QueryRow(query, args...).Scan(&matchID)
 	if err == sql.ErrNoRows {

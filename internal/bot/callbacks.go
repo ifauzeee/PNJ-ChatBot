@@ -99,22 +99,58 @@ Pilih menu di bawah untuk memulai:`,
 }
 
 func (b *Bot) handleSearchCallback(telegramID int64, value string, callback *tgbotapi.CallbackQuery) {
-
-	deleteMsg := tgbotapi.NewDeleteMessage(telegramID, callback.Message.MessageID)
-	b.api.Send(deleteMsg)
-
 	if value == "cancel" {
+		deleteMsg := tgbotapi.NewDeleteMessage(telegramID, callback.Message.MessageID)
+		b.api.Send(deleteMsg)
 		b.chat.CancelSearch(telegramID)
 		b.sendMessage(telegramID, "❌ Pencarian dibatalkan.", nil)
 		return
 	}
 
-	preferredDept := ""
-	if value != "any" {
-		preferredDept = value
+	if value == "any" {
+		deleteMsg := tgbotapi.NewDeleteMessage(telegramID, callback.Message.MessageID)
+		b.api.Send(deleteMsg)
+		b.startSearch(telegramID, "", "")
+		return
 	}
 
-	b.startSearch(telegramID, preferredDept)
+	if value == "by_gender" {
+		kb := SearchGenderKeyboard()
+		editMsg := tgbotapi.NewEditMessageText(telegramID, callback.Message.MessageID, "👫 *Pilih Gender Partner:*")
+		editMsg.ParseMode = "Markdown"
+		editMsg.ReplyMarkup = &kb
+		b.api.Send(editMsg)
+		return
+	}
+
+	if value == "by_dept" {
+		kb := SearchDepartmentKeyboard()
+		editMsg := tgbotapi.NewEditMessageText(telegramID, callback.Message.MessageID, "🏛️ *Pilih Jurusan Partner:*")
+		editMsg.ParseMode = "Markdown"
+		editMsg.ReplyMarkup = &kb
+		b.api.Send(editMsg)
+		return
+	}
+
+	if strings.HasPrefix(value, "gender:") {
+		deleteMsg := tgbotapi.NewDeleteMessage(telegramID, callback.Message.MessageID)
+		b.api.Send(deleteMsg)
+		gender := strings.TrimPrefix(value, "gender:")
+		b.startSearch(telegramID, "", gender)
+		return
+	}
+
+	if strings.HasPrefix(value, "dept:") {
+		deleteMsg := tgbotapi.NewDeleteMessage(telegramID, callback.Message.MessageID)
+		b.api.Send(deleteMsg)
+		dept := strings.TrimPrefix(value, "dept:")
+		b.startSearch(telegramID, dept, "")
+		return
+	}
+
+	deleteMsg := tgbotapi.NewDeleteMessage(telegramID, callback.Message.MessageID)
+	b.api.Send(deleteMsg)
+	b.startSearch(telegramID, value, "")
 }
 
 func (b *Bot) handleChatActionCallback(telegramID int64, action string, _ *tgbotapi.CallbackQuery) {
@@ -129,7 +165,7 @@ func (b *Bot) handleChatActionCallback(telegramID int64, action string, _ *tgbot
 			b.sendMessage(partnerID, "👋 *Partner kamu telah memutus chat.*\n\nGunakan /search untuk mencari partner baru.", nil)
 		}
 		b.sendMessage(telegramID, "⏭️ *Mencari partner baru...*", nil)
-		b.startSearch(telegramID, "")
+		b.startSearch(telegramID, "", "")
 
 	case "stop":
 		partnerID, _ := b.chat.StopChat(telegramID)

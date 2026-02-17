@@ -16,7 +16,7 @@ func NewChatService(db *database.DB) *ChatService {
 	return &ChatService{db: db}
 }
 
-func (s *ChatService) SearchPartner(telegramID int64, preferredDept string) (int64, error) {
+func (s *ChatService) SearchPartner(telegramID int64, preferredDept, preferredGender string) (int64, error) {
 
 	session, err := s.db.GetActiveSession(telegramID)
 	if err != nil {
@@ -34,7 +34,7 @@ func (s *ChatService) SearchPartner(telegramID int64, preferredDept string) (int
 		return 0, fmt.Errorf("kamu sudah dalam antrian pencarian. Tunggu sebentar ya!")
 	}
 
-	matchID, err := s.db.FindMatch(telegramID, preferredDept)
+	matchID, err := s.db.FindMatch(telegramID, preferredDept, preferredGender)
 	if err != nil {
 		return 0, fmt.Errorf("gagal mencari partner: %w", err)
 	}
@@ -56,12 +56,21 @@ func (s *ChatService) SearchPartner(telegramID int64, preferredDept string) (int
 		return matchID, nil
 	}
 
-	if err := s.db.AddToQueue(telegramID, preferredDept); err != nil {
+	if err := s.db.AddToQueue(telegramID, preferredDept, preferredGender); err != nil {
 		return 0, fmt.Errorf("gagal menambahkan ke antrian: %w", err)
 	}
 
-	s.db.SetUserState(telegramID, models.StateSearching, preferredDept)
-	log.Printf("🔍 User %d added to queue (dept: %s)", telegramID, preferredDept)
+	stateData := preferredDept
+	if preferredGender != "" {
+		if stateData != "" {
+			stateData += "|" + preferredGender
+		} else {
+			stateData = preferredGender
+		}
+	}
+
+	s.db.SetUserState(telegramID, models.StateSearching, stateData)
+	log.Printf("🔍 User %d added to queue (dept: %s, gender: %s)", telegramID, preferredDept, preferredGender)
 	return 0, nil
 }
 
