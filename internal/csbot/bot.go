@@ -2,6 +2,7 @@ package csbot
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/pnj-anonymous-bot/internal/config"
@@ -34,8 +35,10 @@ func New(cfg *config.Config, db *database.DB) (*CSBot, error) {
 }
 
 func (b *CSBot) Start() {
+	username := strings.Trim(b.api.Self.UserName, "\"")
+
 	logger.Info("🛠️ CS Bot authorized",
-		zap.String("username", b.api.Self.UserName),
+		zap.String("username", username),
 		zap.Int64("admin_id", b.cfg.MaintenanceAccountID),
 	)
 
@@ -50,9 +53,10 @@ func (b *CSBot) Start() {
 		if update.Message == nil {
 			continue
 		}
-		logger.Info("📥 CS Update",
+		logger.Debug("CS update received",
 			zap.Int64("from_id", update.Message.From.ID),
-			zap.String("text", update.Message.Text),
+			zap.Bool("is_command", update.Message.IsCommand()),
+			zap.Int("text_len", len(update.Message.Text)),
 		)
 		b.handleMessage(update.Message)
 	}
@@ -185,9 +189,10 @@ func (b *CSBot) processQueue() {
 }
 
 func (b *CSBot) forwardToAdmin(userID, adminID int64, msg *tgbotapi.Message) {
-	logger.Info("📲 Forwarding msg to admin",
+	logger.Debug("Forwarding message to admin",
 		zap.Int64("from_user", userID),
 		zap.Int64("to_admin", adminID),
+		zap.Int("text_len", len(msg.Text)),
 	)
 	text := fmt.Sprintf("👤 <b>USER %d</b>\n\n%s", userID, msg.Text)
 	b.sendMessage(adminID, text)

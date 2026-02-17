@@ -15,6 +15,12 @@ services:
     image: postgres:15-alpine
     container_name: pnj-postgres
     restart: unless-stopped
+    command:
+      - "postgres"
+      - "-c"
+      - "log_min_messages=warning"
+      - "-c"
+      - "log_checkpoints=off"
     environment:
       - POSTGRES_USER=pnjbot
       - POSTGRES_PASSWORD=pnjpassword
@@ -34,6 +40,7 @@ services:
     image: redis:7-alpine
     container_name: pnj-redis
     restart: unless-stopped
+    command: ["redis-server", "--loglevel", "warning"]
     volumes:
       - redis-data:/data
     ports:
@@ -57,6 +64,7 @@ services:
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
       - '--storage.tsdb.path=/prometheus'
+      - '--log.level=warn'
 
   pnj-bot:
     build:
@@ -75,6 +83,7 @@ services:
       - DB_NAME=pnj_anonymous
       - REDIS_URL=redis:6379
       - TZ=Asia/Jakarta
+      - APP_ENV=production
     depends_on:
       postgres:
         condition: service_healthy
@@ -107,6 +116,7 @@ services:
       - DB_PASSWORD=pnjpassword
       - DB_NAME=pnj_anonymous
       - TZ=Asia/Jakarta
+      - APP_ENV=production
     entrypoint: ["/app/pnj-csbot"]
     depends_on:
       postgres:

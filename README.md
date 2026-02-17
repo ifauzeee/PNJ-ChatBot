@@ -78,6 +78,7 @@ cp .env.example .env
 3. **Edit `.env`** dengan konfigurasi kamu:
 ```env
 BOT_TOKEN=your_telegram_bot_token
+LOG_LEVEL=info
 SMTP_HOST=smtp.gmail.com
 SMTP_PORT=587
 SMTP_USERNAME=your_email@gmail.com

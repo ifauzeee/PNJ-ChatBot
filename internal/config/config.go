@@ -1,11 +1,13 @@
 package config
 
 import (
+	"errors"
 	"os"
 	"strconv"
 
 	"github.com/joho/godotenv"
 	"github.com/pnj-anonymous-bot/internal/logger"
+	"go.uber.org/zap"
 )
 
 type Config struct {
@@ -34,9 +36,10 @@ type Config struct {
 }
 
 func Load() *Config {
-
 	if err := godotenv.Load(); err != nil {
-		logger.Warn("⚠️ No .env file found, using environment variables")
+		if !errors.Is(err, os.ErrNotExist) {
+			logger.Warn("Failed to load .env, using existing environment variables", zap.Error(err))
+		}
 	}
 
 	cfg := &Config{

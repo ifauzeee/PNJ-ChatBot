@@ -61,7 +61,7 @@ func (s *ChatService) SearchPartner(telegramID int64, preferredDept, preferredGe
 			s.db.SetUserState(telegramID, models.StateInChat, "")
 			s.db.SetUserState(item.TelegramID, models.StateInChat, "")
 
-			logger.Info("💬 Chat matched",
+			logger.Debug("Chat matched",
 				zap.Int64("user1", telegramID),
 				zap.Int64("user2", item.TelegramID),
 			)
@@ -79,7 +79,7 @@ func (s *ChatService) SearchPartner(telegramID int64, preferredDept, preferredGe
 	s.redis.client.RPush(s.redis.ctx, queueKey, raw)
 
 	s.db.SetUserState(telegramID, models.StateSearching, "")
-	logger.Info("🔍 Added to queue", zap.Int64("user_id", telegramID))
+	logger.Debug("Added to queue", zap.Int64("user_id", telegramID))
 	return 0, nil
 }
 

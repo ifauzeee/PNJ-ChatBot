@@ -2,6 +2,7 @@ package logger
 
 import (
 	"os"
+	"strings"
 
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -12,7 +13,7 @@ var Log *zap.Logger
 func Init() {
 	var config zap.Config
 
-	env := os.Getenv("APP_ENV")
+	env := strings.ToLower(strings.TrimSpace(os.Getenv("APP_ENV")))
 	if env == "production" {
 		config = zap.NewProductionConfig()
 		config.EncoderConfig.EncodeTime = zapcore.ISO8601TimeEncoder
@@ -20,6 +21,17 @@ func Init() {
 		config = zap.NewDevelopmentConfig()
 		config.EncoderConfig.EncodeLevel = zapcore.CapitalColorLevelEncoder
 	}
+
+	level := strings.ToLower(strings.TrimSpace(os.Getenv("LOG_LEVEL")))
+	if level == "" {
+		level = "info"
+	}
+
+	parsedLevel, parseErr := zapcore.ParseLevel(level)
+	if parseErr != nil {
+		parsedLevel = zapcore.InfoLevel
+	}
+	config.Level = zap.NewAtomicLevelAt(parsedLevel)
 
 	var err error
 	Log, err = config.Build(zap.AddCallerSkip(1))

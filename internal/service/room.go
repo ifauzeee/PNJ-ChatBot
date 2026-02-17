@@ -65,7 +65,7 @@ func (s *RoomService) JoinRoom(telegramID int64, slug string) (*models.Room, err
 		return nil, err
 	}
 
-	logger.Info("👥 User joined circle",
+	logger.Debug("User joined circle",
 		zap.Int64("user_id", telegramID),
 		zap.String("slug", slug),
 	)
@@ -83,7 +83,7 @@ func (s *RoomService) LeaveRoom(telegramID int64) error {
 		return err
 	}
 
-	logger.Info("👋 User left circle", zap.Int64("user_id", telegramID))
+	logger.Debug("User left circle", zap.Int64("user_id", telegramID))
 	return nil
 }
 
