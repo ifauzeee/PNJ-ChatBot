@@ -16,7 +16,7 @@ func NewChatService(db *database.DB) *ChatService {
 	return &ChatService{db: db}
 }
 
-func (s *ChatService) SearchPartner(telegramID int64, preferredDept, preferredGender string) (int64, error) {
+func (s *ChatService) SearchPartner(telegramID int64, preferredDept, preferredGender string, preferredYear int) (int64, error) {
 
 	session, err := s.db.GetActiveSession(telegramID)
 	if err != nil {
@@ -34,7 +34,7 @@ func (s *ChatService) SearchPartner(telegramID int64, preferredDept, preferredGe
 		return 0, fmt.Errorf("kamu sudah dalam antrian pencarian. Tunggu sebentar ya!")
 	}
 
-	matchID, err := s.db.FindMatch(telegramID, preferredDept, preferredGender)
+	matchID, err := s.db.FindMatch(telegramID, preferredDept, preferredGender, preferredYear)
 	if err != nil {
 		return 0, fmt.Errorf("gagal mencari partner: %w", err)
 	}
@@ -56,7 +56,7 @@ func (s *ChatService) SearchPartner(telegramID int64, preferredDept, preferredGe
 		return matchID, nil
 	}
 
-	if err := s.db.AddToQueue(telegramID, preferredDept, preferredGender); err != nil {
+	if err := s.db.AddToQueue(telegramID, preferredDept, preferredGender, preferredYear); err != nil {
 		return 0, fmt.Errorf("gagal menambahkan ke antrian: %w", err)
 	}
 
@@ -68,9 +68,17 @@ func (s *ChatService) SearchPartner(telegramID int64, preferredDept, preferredGe
 			stateData = preferredGender
 		}
 	}
+	if preferredYear != 0 {
+		yearStr := fmt.Sprintf("%d", preferredYear)
+		if stateData != "" {
+			stateData += "|" + yearStr
+		} else {
+			stateData = yearStr
+		}
+	}
 
 	s.db.SetUserState(telegramID, models.StateSearching, stateData)
-	log.Printf("🔍 User %d added to queue (dept: %s, gender: %s)", telegramID, preferredDept, preferredGender)
+	log.Printf("🔍 User %d added to queue (dept: %s, gender: %s, year: %d)", telegramID, preferredDept, preferredGender, preferredYear)
 	return 0, nil
 }
 
@@ -116,12 +124,12 @@ func (s *ChatService) GetPartner(telegramID int64) (int64, error) {
 	return s.db.GetChatPartner(telegramID)
 }
 
-func (s *ChatService) GetPartnerInfo(partnerID int64) (string, string, error) {
+func (s *ChatService) GetPartnerInfo(partnerID int64) (string, string, int, error) {
 	user, err := s.db.GetUser(partnerID)
 	if err != nil || user == nil {
-		return "", "", err
+		return "", "", 0, err
 	}
-	return string(user.Gender), string(user.Department), nil
+	return string(user.Gender), string(user.Department), user.Year, nil
 }
 
 func (s *ChatService) GetQueueCount() (int, error) {

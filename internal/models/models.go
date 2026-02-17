@@ -88,6 +88,7 @@ type User struct {
 	Email       string     `json:"email"`
 	Gender      Gender     `json:"gender"`
 	Department  Department `json:"department"`
+	Year        int        `json:"year"`
 	DisplayName string     `json:"display_name"`
 	IsVerified  bool       `json:"is_verified"`
 	IsBanned    bool       `json:"is_banned"`
@@ -105,6 +106,7 @@ const (
 	StateAwaitingOTP         UserState = "awaiting_otp"
 	StateAwaitingGender      UserState = "awaiting_gender"
 	StateAwaitingDept        UserState = "awaiting_department"
+	StateAwaitingYear        UserState = "awaiting_year"
 	StateSearching           UserState = "searching"
 	StateInChat              UserState = "in_chat"
 	StateAwaitingConfess     UserState = "awaiting_confession"
@@ -137,6 +139,7 @@ type ChatQueue struct {
 	TelegramID      int64     `json:"telegram_id"`
 	PreferredDept   string    `json:"preferred_dept"`
 	PreferredGender string    `json:"preferred_gender"`
+	PreferredYear   int       `json:"preferred_year"`
 	JoinedAt        time.Time `json:"joined_at"`
 }
 

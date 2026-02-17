@@ -46,6 +46,8 @@ func New(dbPath string) (*DB, error) {
 	}
 
 	d.Exec("ALTER TABLE chat_queue ADD COLUMN preferred_gender TEXT DEFAULT ''")
+	d.Exec("ALTER TABLE users ADD COLUMN year INTEGER DEFAULT 0")
+	d.Exec("ALTER TABLE chat_queue ADD COLUMN preferred_year INTEGER DEFAULT 0")
 
 	log.Println("✅ Database connected and migrated successfully")
 	return d, nil
@@ -59,6 +61,7 @@ func (d *DB) migrate() error {
 			email TEXT DEFAULT '',
 			gender TEXT DEFAULT '',
 			department TEXT DEFAULT '',
+			year INTEGER DEFAULT 0,
 			display_name TEXT DEFAULT '',
 			is_verified BOOLEAN DEFAULT FALSE,
 			is_banned BOOLEAN DEFAULT FALSE,
@@ -93,6 +96,7 @@ func (d *DB) migrate() error {
 			telegram_id INTEGER UNIQUE NOT NULL,
 			preferred_dept TEXT DEFAULT '',
 			preferred_gender TEXT DEFAULT '',
+			preferred_year INTEGER DEFAULT 0,
 			joined_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 			FOREIGN KEY (telegram_id) REFERENCES users(telegram_id)
 		)`,

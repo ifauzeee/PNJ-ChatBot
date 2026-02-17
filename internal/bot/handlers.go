@@ -42,6 +42,13 @@ Ketik /regist dan ikuti proses verifikasi email PNJ kamu.`, msg.From.FirstName)
 		return
 	}
 
+	if user.Year == 0 {
+		kb := YearKeyboard()
+		b.sendMessage(telegramID, "🎓 *Pilih Tahun Angkatan Kamu:*", &kb)
+		b.db.SetUserState(telegramID, models.StateAwaitingYear, "")
+		return
+	}
+
 	if string(user.Department) == "" {
 		kb := DepartmentKeyboard()
 		b.sendMessage(telegramID, "🏛️ *Pilih Jurusan Kamu:*\n\nPilih jurusan di bawah ini:", &kb)
@@ -198,7 +205,21 @@ func (b *Bot) handleSearch(msg *tgbotapi.Message) {
 
 	args := msg.CommandArguments()
 	if args != "" {
-		b.startSearch(telegramID, args, "")
+		parts := strings.Fields(args)
+		preferredDept := ""
+		preferredGender := ""
+		preferredYear := 0
+
+		for _, part := range parts {
+			if models.IsValidDepartment(part) {
+				preferredDept = part
+			} else if part == "Laki-laki" || part == "Perempuan" {
+				preferredGender = part
+			} else if year, err := strconv.Atoi(part); err == nil && year >= 2018 && year <= 2026 {
+				preferredYear = year
+			}
+		}
+		b.startSearch(telegramID, preferredDept, preferredGender, preferredYear)
 		return
 	}
 
@@ -206,12 +227,12 @@ func (b *Bot) handleSearch(msg *tgbotapi.Message) {
 	b.sendMessage(telegramID, "🔍 *Cari Partner Chat Anonim*\n\nPilih filter pencarian:", &kb)
 }
 
-func (b *Bot) startSearch(telegramID int64, preferredDept, preferredGender string) {
+func (b *Bot) startSearch(telegramID int64, preferredDept, preferredGender string, preferredYear int) {
 	if preferredDept == "any" {
 		preferredDept = ""
 	}
 
-	matchID, err := b.chat.SearchPartner(telegramID, preferredDept, preferredGender)
+	matchID, err := b.chat.SearchPartner(telegramID, preferredDept, preferredGender, preferredYear)
 	if err != nil {
 		b.sendMessage(telegramID, fmt.Sprintf("⚠️ %s", err.Error()), nil)
 		return
@@ -238,10 +259,8 @@ _Kamu akan diberi notifikasi ketika partner ditemukan_`, queueCount)
 }
 
 func (b *Bot) notifyMatchFound(user1ID, user2ID int64) {
-
-	gender2, dept2, _ := b.chat.GetPartnerInfo(user2ID)
-
-	gender1, dept1, _ := b.chat.GetPartnerInfo(user1ID)
+	gender1, dept1, year1, _ := b.chat.GetPartnerInfo(user1ID)
+	gender2, dept2, year2, _ := b.chat.GetPartnerInfo(user2ID)
 
 	kb := ChatActionKeyboard()
 
@@ -249,28 +268,30 @@ func (b *Bot) notifyMatchFound(user1ID, user2ID int64) {
 
 ━━━━━━━━━━━━━━━━━━━
 Partner kamu:
-%s %s | %s %s
+%s %s | 🎓 %d
+%s %s
 ━━━━━━━━━━━━━━━━━━━
 
 💬 Mulai ngobrol sekarang!
 Semua pesan akan diteruskan secara *anonim*.
 
 _Ketik pesan untuk memulai..._`,
-		models.GenderEmoji(models.Gender(gender2)), gender2,
+		models.GenderEmoji(models.Gender(gender2)), gender2, year2,
 		models.DepartmentEmoji(models.Department(dept2)), dept2)
 
 	msg2 := fmt.Sprintf(`🎉 *Partner Ditemukan!*
 
 ━━━━━━━━━━━━━━━━━━━
 Partner kamu:
-%s %s | %s %s
+%s %s | 🎓 %d
+%s %s
 ━━━━━━━━━━━━━━━━━━━
 
 💬 Mulai ngobrol sekarang!
 Semua pesan akan diteruskan secara *anonim*.
 
 _Ketik pesan untuk memulai..._`,
-		models.GenderEmoji(models.Gender(gender1)), gender1,
+		models.GenderEmoji(models.Gender(gender1)), gender1, year1,
 		models.DepartmentEmoji(models.Department(dept1)), dept1)
 
 	b.sendMessage(user1ID, msg1, &kb)
@@ -292,7 +313,7 @@ func (b *Bot) handleNext(msg *tgbotapi.Message) {
 	}
 
 	b.sendMessage(telegramID, "⏭️ *Mencari partner baru...*", nil)
-	b.startSearch(telegramID, "", "")
+	b.startSearch(telegramID, "", "", 0)
 }
 
 func (b *Bot) handleStop(msg *tgbotapi.Message) {
@@ -581,6 +602,7 @@ func (b *Bot) handleProfile(msg *tgbotapi.Message) {
 ━━━━━━━━━━━━━━━━━━━
 🏷️ *Nama Anonim:* %s
 %s *Gender:* %s
+🎓 *Angkatan:* %d
 %s *Jurusan:* %s
 📧 *Email:* ||%s||
 ━━━━━━━━━━━━━━━━━━━
@@ -593,6 +615,7 @@ func (b *Bot) handleProfile(msg *tgbotapi.Message) {
 ⚠️ Report Count: %d/3`,
 		user.DisplayName,
 		models.GenderEmoji(user.Gender), string(user.Gender),
+		user.Year,
 		models.DepartmentEmoji(user.Department), string(user.Department),
 		maskEmail(user.Email),
 		totalChats,

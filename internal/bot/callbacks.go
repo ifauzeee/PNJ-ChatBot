@@ -37,6 +37,8 @@ func (b *Bot) handleCallback(callback *tgbotapi.CallbackQuery) {
 		b.handleMenuCallback(telegramID, value, callback)
 	case "edit":
 		b.handleEditCallback(telegramID, value, callback)
+	case "year":
+		b.handleYearCallback(telegramID, value, callback)
 	case "react":
 		b.handleReactionCallback(telegramID, value, callback)
 	case "whisper":
@@ -76,7 +78,13 @@ func (b *Bot) handleDeptCallback(telegramID int64, dept string, callback *tgbota
 
 	b.sendMessage(telegramID, fmt.Sprintf("✅ Jurusan dipilih: %s *%s*", emoji, dept), nil)
 
-	user, _ := b.db.GetUser(telegramID)
+	user, err := b.db.GetUser(telegramID)
+	if err == nil && user != nil && user.Year == 0 {
+		kb := YearKeyboard()
+		b.sendMessage(telegramID, "🎓 *Pilih Tahun Angkatan (Masuk) Kamu:*", &kb)
+		return
+	}
+
 	if user != nil {
 		completeText := fmt.Sprintf(`🎉 *Profil Kamu Sudah Lengkap!*
 
@@ -110,7 +118,7 @@ func (b *Bot) handleSearchCallback(telegramID int64, value string, callback *tgb
 	if value == "any" {
 		deleteMsg := tgbotapi.NewDeleteMessage(telegramID, callback.Message.MessageID)
 		b.api.Send(deleteMsg)
-		b.startSearch(telegramID, "", "")
+		b.startSearch(telegramID, "", "", 0)
 		return
 	}
 
@@ -132,11 +140,29 @@ func (b *Bot) handleSearchCallback(telegramID int64, value string, callback *tgb
 		return
 	}
 
+	if value == "by_year" {
+		kb := SearchYearKeyboard()
+		editMsg := tgbotapi.NewEditMessageText(telegramID, callback.Message.MessageID, "🎓 *Pilih Angkatan Partner:*")
+		editMsg.ParseMode = "Markdown"
+		editMsg.ReplyMarkup = &kb
+		b.api.Send(editMsg)
+		return
+	}
+
+	if strings.HasPrefix(value, "year:") {
+		deleteMsg := tgbotapi.NewDeleteMessage(telegramID, callback.Message.MessageID)
+		b.api.Send(deleteMsg)
+		yearStr := strings.TrimPrefix(value, "year:")
+		year, _ := strconv.Atoi(yearStr)
+		b.startSearch(telegramID, "", "", year)
+		return
+	}
+
 	if strings.HasPrefix(value, "gender:") {
 		deleteMsg := tgbotapi.NewDeleteMessage(telegramID, callback.Message.MessageID)
 		b.api.Send(deleteMsg)
 		gender := strings.TrimPrefix(value, "gender:")
-		b.startSearch(telegramID, "", gender)
+		b.startSearch(telegramID, "", gender, 0)
 		return
 	}
 
@@ -144,13 +170,13 @@ func (b *Bot) handleSearchCallback(telegramID int64, value string, callback *tgb
 		deleteMsg := tgbotapi.NewDeleteMessage(telegramID, callback.Message.MessageID)
 		b.api.Send(deleteMsg)
 		dept := strings.TrimPrefix(value, "dept:")
-		b.startSearch(telegramID, dept, "")
+		b.startSearch(telegramID, dept, "", 0)
 		return
 	}
 
 	deleteMsg := tgbotapi.NewDeleteMessage(telegramID, callback.Message.MessageID)
 	b.api.Send(deleteMsg)
-	b.startSearch(telegramID, value, "")
+	b.startSearch(telegramID, value, "", 0)
 }
 
 func (b *Bot) handleChatActionCallback(telegramID int64, action string, _ *tgbotapi.CallbackQuery) {
@@ -165,7 +191,7 @@ func (b *Bot) handleChatActionCallback(telegramID int64, action string, _ *tgbot
 			b.sendMessage(partnerID, "👋 *Partner kamu telah memutus chat.*\n\nGunakan /search untuk mencari partner baru.", nil)
 		}
 		b.sendMessage(telegramID, "⏭️ *Mencari partner baru...*", nil)
-		b.startSearch(telegramID, "", "")
+		b.startSearch(telegramID, "", "", 0)
 
 	case "stop":
 		partnerID, _ := b.chat.StopChat(telegramID)
@@ -262,10 +288,37 @@ func (b *Bot) handleEditCallback(telegramID int64, field string, callback *tgbot
 		b.sendMessage(telegramID, "👤 *Pilih Gender Baru:*", &kb)
 		b.db.SetUserState(telegramID, models.StateAwaitingGender, "edit")
 
-	case "department":
+	case "year":
+		kb := YearKeyboard()
+		b.sendMessage(telegramID, "🎓 *Pilih Tahun Angkatan Baru:*", &kb)
+		b.db.SetUserState(telegramID, models.StateAwaitingYear, "edit")
+	}
+}
+
+func (b *Bot) handleYearCallback(telegramID int64, value string, callback *tgbotapi.CallbackQuery) {
+	year, _ := strconv.Atoi(value)
+	err := b.profile.SetYear(telegramID, year)
+	if err != nil {
+		b.sendMessage(telegramID, fmt.Sprintf("⚠️ %s", err.Error()), nil)
+		return
+	}
+
+	deleteMsg := tgbotapi.NewDeleteMessage(telegramID, callback.Message.MessageID)
+	b.api.Send(deleteMsg)
+
+	b.sendMessage(telegramID, fmt.Sprintf("✅ Angkatan dipilih: *%d*", year), nil)
+
+	_, stateData, _ := b.db.GetUserState(telegramID)
+	if stateData == "edit" {
+		b.db.SetUserState(telegramID, models.StateNone, "")
+		b.sendMessage(telegramID, "✅ Profil berhasil diperbarui!", nil)
+		return
+	}
+
+	user, _ := b.db.GetUser(telegramID)
+	if user != nil && string(user.Department) == "" {
 		kb := DepartmentKeyboard()
-		b.sendMessage(telegramID, "🏛️ *Pilih Jurusan Baru:*", &kb)
-		b.db.SetUserState(telegramID, models.StateAwaitingDept, "edit")
+		b.sendMessage(telegramID, "🏛️ *Pilih Jurusan Kamu:*\n\nPilih jurusan di bawah ini:", &kb)
 	}
 }
 

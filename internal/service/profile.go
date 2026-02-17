@@ -28,6 +28,18 @@ func (s *ProfileService) SetGender(telegramID int64, gender string) error {
 		return err
 	}
 
+	return s.db.SetUserState(telegramID, models.StateAwaitingYear, "")
+}
+
+func (s *ProfileService) SetYear(telegramID int64, year int) error {
+	if year < 2018 || year > 2026 {
+		return fmt.Errorf("tahun angkatan tidak valid")
+	}
+
+	if err := s.db.UpdateUserYear(telegramID, year); err != nil {
+		return err
+	}
+
 	return s.db.SetUserState(telegramID, models.StateAwaitingDept, "")
 }
 

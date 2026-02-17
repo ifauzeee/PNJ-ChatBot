@@ -17,6 +17,25 @@ func GenderKeyboard() tgbotapi.InlineKeyboardMarkup {
 	)
 }
 
+func YearKeyboard() tgbotapi.InlineKeyboardMarkup {
+	years := []int{2020, 2021, 2022, 2023, 2024, 2025}
+	var rows [][]tgbotapi.InlineKeyboardButton
+
+	for i := 0; i < len(years); i += 3 {
+		var row []tgbotapi.InlineKeyboardButton
+		for j := 0; j < 3 && i+j < len(years); j++ {
+			year := years[i+j]
+			row = append(row, tgbotapi.NewInlineKeyboardButtonData(
+				fmt.Sprintf("🎓 %d", year),
+				fmt.Sprintf("year:%d", year),
+			))
+		}
+		rows = append(rows, row)
+	}
+
+	return tgbotapi.NewInlineKeyboardMarkup(rows...)
+}
+
 func DepartmentKeyboard() tgbotapi.InlineKeyboardMarkup {
 	depts := models.AllDepartments()
 	var rows [][]tgbotapi.InlineKeyboardButton
@@ -45,9 +64,35 @@ func SearchKeyboard() tgbotapi.InlineKeyboardMarkup {
 			tgbotapi.NewInlineKeyboardButtonData("🏛️ Berdasarkan Jurusan", "search:by_dept"),
 		),
 		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData("🎓 Berdasarkan Angkatan", "search:by_year"),
+		),
+		tgbotapi.NewInlineKeyboardRow(
 			tgbotapi.NewInlineKeyboardButtonData("🔙 Kembali", "menu:main"),
 		),
 	)
+}
+
+func SearchYearKeyboard() tgbotapi.InlineKeyboardMarkup {
+	years := []int{2020, 2021, 2022, 2023, 2024, 2025}
+	var rows [][]tgbotapi.InlineKeyboardButton
+
+	for i := 0; i < len(years); i += 3 {
+		var row []tgbotapi.InlineKeyboardButton
+		for j := 0; j < 3 && i+j < len(years); j++ {
+			year := years[i+j]
+			row = append(row, tgbotapi.NewInlineKeyboardButtonData(
+				fmt.Sprintf("🎓 Angkatan %d", year),
+				fmt.Sprintf("search:year:%d", year),
+			))
+		}
+		rows = append(rows, row)
+	}
+
+	rows = append(rows, tgbotapi.NewInlineKeyboardRow(
+		tgbotapi.NewInlineKeyboardButtonData("🔙 Kembali", "menu:search"),
+	))
+
+	return tgbotapi.NewInlineKeyboardMarkup(rows...)
 }
 
 func SearchDepartmentKeyboard() tgbotapi.InlineKeyboardMarkup {
@@ -129,6 +174,9 @@ func EditProfileKeyboard() tgbotapi.InlineKeyboardMarkup {
 	return tgbotapi.NewInlineKeyboardMarkup(
 		tgbotapi.NewInlineKeyboardRow(
 			tgbotapi.NewInlineKeyboardButtonData("👤 Ubah Gender", "edit:gender"),
+			tgbotapi.NewInlineKeyboardButtonData("🎓 Ubah Angkatan", "edit:year"),
+		),
+		tgbotapi.NewInlineKeyboardRow(
 			tgbotapi.NewInlineKeyboardButtonData("🏛️ Ubah Jurusan", "edit:department"),
 		),
 		tgbotapi.NewInlineKeyboardRow(

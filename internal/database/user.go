@@ -22,11 +22,11 @@ func (d *DB) CreateUser(telegramID int64) (*models.User, error) {
 func (d *DB) GetUser(telegramID int64) (*models.User, error) {
 	user := &models.User{}
 	err := d.QueryRow(
-		`SELECT id, telegram_id, email, gender, department, display_name, 
+		`SELECT id, telegram_id, email, gender, department, year, display_name, 
 		        is_verified, is_banned, report_count, total_chats, created_at, updated_at 
 		 FROM users WHERE telegram_id = ?`, telegramID,
 	).Scan(
-		&user.ID, &user.TelegramID, &user.Email, &user.Gender, &user.Department,
+		&user.ID, &user.TelegramID, &user.Email, &user.Gender, &user.Department, &user.Year,
 		&user.DisplayName, &user.IsVerified, &user.IsBanned, &user.ReportCount,
 		&user.TotalChats, &user.CreatedAt, &user.UpdatedAt,
 	)
@@ -67,6 +67,14 @@ func (d *DB) UpdateUserDepartment(telegramID int64, dept string) error {
 	_, err := d.Exec(
 		`UPDATE users SET department = ?, updated_at = ? WHERE telegram_id = ?`,
 		dept, time.Now(), telegramID,
+	)
+	return err
+}
+
+func (d *DB) UpdateUserYear(telegramID int64, year int) error {
+	_, err := d.Exec(
+		`UPDATE users SET year = ?, updated_at = ? WHERE telegram_id = ?`,
+		year, time.Now(), telegramID,
 	)
 	return err
 }
@@ -171,5 +179,5 @@ func (d *DB) IsUserProfileComplete(telegramID int64) (bool, error) {
 	if err != nil || user == nil {
 		return false, err
 	}
-	return user.IsVerified && string(user.Gender) != "" && string(user.Department) != "", nil
+	return user.IsVerified && string(user.Gender) != "" && string(user.Department) != "" && user.Year != 0, nil
 }

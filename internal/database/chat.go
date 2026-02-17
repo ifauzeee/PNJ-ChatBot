@@ -8,10 +8,10 @@ import (
 	"github.com/pnj-anonymous-bot/internal/models"
 )
 
-func (d *DB) AddToQueue(telegramID int64, preferredDept, preferredGender string) error {
+func (d *DB) AddToQueue(telegramID int64, preferredDept, preferredGender string, preferredYear int) error {
 	_, err := d.Exec(
-		`INSERT OR REPLACE INTO chat_queue (telegram_id, preferred_dept, preferred_gender, joined_at) VALUES (?, ?, ?, ?)`,
-		telegramID, preferredDept, preferredGender, time.Now(),
+		`INSERT OR REPLACE INTO chat_queue (telegram_id, preferred_dept, preferred_gender, preferred_year, joined_at) VALUES (?, ?, ?, ?, ?)`,
+		telegramID, preferredDept, preferredGender, preferredYear, time.Now(),
 	)
 	return err
 }
@@ -27,7 +27,7 @@ func (d *DB) IsInQueue(telegramID int64) (bool, error) {
 	return count > 0, err
 }
 
-func (d *DB) FindMatch(telegramID int64, preferredDept, preferredGender string) (int64, error) {
+func (d *DB) FindMatch(telegramID int64, preferredDept, preferredGender string, preferredYear int) (int64, error) {
 	var matchID int64
 	var query string
 	var args []interface{}
@@ -46,6 +46,11 @@ func (d *DB) FindMatch(telegramID int64, preferredDept, preferredGender string) 
 	if preferredGender != "" {
 		query += ` AND u.gender = ?`
 		args = append(args, preferredGender)
+	}
+
+	if preferredYear != 0 {
+		query += ` AND u.year = ?`
+		args = append(args, preferredYear)
 	}
 
 	query += ` AND cq.telegram_id NOT IN (
@@ -166,9 +171,9 @@ func (d *DB) GetTotalChatSessions(telegramID int64) (int, error) {
 }
 
 func (d *DB) GetExpiredQueueItems(timeoutSeconds int) ([]models.ChatQueue, error) {
-	query := `SELECT telegram_id, preferred_dept, preferred_gender, joined_at 
+	query := `SELECT telegram_id, preferred_dept, preferred_gender, preferred_year, joined_at 
 			  FROM chat_queue 
-			  WHERE (preferred_dept != '' OR preferred_gender != '')
+			  WHERE (preferred_dept != '' OR preferred_gender != '' OR preferred_year != 0)
 			  AND joined_at <= ?`
 
 	threshold := time.Now().Add(-time.Duration(timeoutSeconds) * time.Second)
@@ -182,7 +187,7 @@ func (d *DB) GetExpiredQueueItems(timeoutSeconds int) ([]models.ChatQueue, error
 	var items []models.ChatQueue
 	for rows.Next() {
 		var item models.ChatQueue
-		if err := rows.Scan(&item.TelegramID, &item.PreferredDept, &item.PreferredGender, &item.JoinedAt); err != nil {
+		if err := rows.Scan(&item.TelegramID, &item.PreferredDept, &item.PreferredGender, &item.PreferredYear, &item.JoinedAt); err != nil {
 			return nil, err
 		}
 		items = append(items, item)
@@ -192,7 +197,7 @@ func (d *DB) GetExpiredQueueItems(timeoutSeconds int) ([]models.ChatQueue, error
 
 func (d *DB) ClearQueueFilters(telegramID int64) error {
 	_, err := d.Exec(
-		`UPDATE chat_queue SET preferred_dept = '', preferred_gender = '' WHERE telegram_id = ?`,
+		`UPDATE chat_queue SET preferred_dept = '', preferred_gender = '', preferred_year = 0 WHERE telegram_id = ?`,
 		telegramID,
 	)
 	return err
