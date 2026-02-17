@@ -19,17 +19,17 @@ func (b *Bot) handleStart(msg *tgbotapi.Message) {
 	}
 
 	if !user.IsVerified {
-		welcomeText := fmt.Sprintf(`🎭 *Selamat Datang di PNJ Anonymous Bot!*
+		welcomeText := fmt.Sprintf(`🎭 <b>Selamat Datang di PNJ Anonymous Bot!</b>
 
-Hai %s! 👋
+Hai <b>%s</b>! 👋
 
-Bot ini adalah platform anonim khusus untuk *mahasiswa Politeknik Negeri Jakarta* 🏛️
+Bot ini adalah platform anonim khusus untuk <b>mahasiswa Politeknik Negeri Jakarta</b> 🏛️
 
-⚠️ *Email belum diverifikasi!*
+⚠️ <b>Email belum diverifikasi!</b>
 
 Ketik /regist dan ikuti proses verifikasi email PNJ kamu.`, msg.From.FirstName)
 
-		b.sendMessage(telegramID, welcomeText, nil)
+		b.sendMessageHTML(telegramID, welcomeText, nil)
 		return
 	}
 
@@ -66,39 +66,39 @@ func (b *Bot) handleRegist(msg *tgbotapi.Message) {
 		return
 	}
 
-	registText := `🔐 *Verifikasi Email*
+	registText := `🔐 <b>Verifikasi Email</b>
 ━━━━━━━━━━━━━━━━━━━
 Untuk menggunakan bot ini, kamu perlu verifikasi email PNJ kamu.
 
-📧 *Ketik email PNJ kamu:*
-Contoh: _nama@mhsw.pnj.ac.id_
+📧 <b>Ketik email PNJ kamu:</b>
+Contoh: <i>nama@mhsw.pnj.ac.id</i>
 
 Domain yang diterima:
 • @mhsw.pnj.ac.id (Mahasiswa)
 • @stu.pnj.ac.id (Dosen/Staff)`
 
 	b.db.SetUserState(telegramID, models.StateAwaitingEmail, "")
-	b.sendMessage(telegramID, registText, nil)
+	b.sendMessageHTML(telegramID, registText, nil)
 }
 
 func (b *Bot) showMainMenu(telegramID int64, user *models.User) {
 	onlineCount, _ := b.db.GetOnlineUserCount()
 	queueCount, _ := b.chat.GetQueueCount()
 
-	menuText := fmt.Sprintf(`🎭 *PNJ Anonymous Bot*
+	menuText := fmt.Sprintf(`🎭 <b>PNJ Anonymous Bot</b>
 
 ━━━━━━━━━━━━━━━━━━━
-👤 *Profil Kamu*
+👤 <b>Profil Kamu</b>
 ━━━━━━━━━━━━━━━━━━━
 %s %s | %s %s
 🏷️ %s
-📧 ||%s||
+📧 <tg-spoiler>%s</tg-spoiler>
 
 ━━━━━━━━━━━━━━━━━━━
-📊 *Info Bot*
+📊 <b>Info Bot</b>
 ━━━━━━━━━━━━━━━━━━━
-👥 Pengguna terdaftar: *%d*
-🔍 Sedang mencari: *%d*
+Pengguna online: <b>%d</b>
+Antrian chat: <b>%d</b>
 
 ━━━━━━━━━━━━━━━━━━━
 ✨ Pilih menu di bawah ini:`,
@@ -111,7 +111,7 @@ func (b *Bot) showMainMenu(telegramID int64, user *models.User) {
 	)
 
 	kb := MainMenuKeyboard()
-	b.sendMessage(telegramID, menuText, &kb)
+	b.sendMessageHTML(telegramID, menuText, &kb)
 }
 
 func (b *Bot) handleHelp(msg *tgbotapi.Message) {
@@ -679,16 +679,16 @@ func (b *Bot) handleEmailInput(msg *tgbotapi.Message) {
 		return
 	}
 
-	b.sendMessage(telegramID, fmt.Sprintf(`📧 *Kode OTP Telah Dikirim!*
+	b.sendMessageHTML(telegramID, fmt.Sprintf(`📧 <b>Kode OTP Telah Dikirim!</b>
 
 ━━━━━━━━━━━━━━━━━━━
-Email: *%s*
-⏱️ Kode berlaku: *%d menit*
+Email: <b>%s</b>
+⏱️ Kode berlaku: <b>%d menit</b>
 ━━━━━━━━━━━━━━━━━━━
 
 📬 Cek inbox email kamu dan masukkan kode 6 digit yang diterima.
 
-🔢 _Ketik kode OTP kamu:_`,
+🔢 <i>Ketik kode OTP kamu:</i>`,
 		maskEmail(emailAddr), b.cfg.OTPExpiryMinutes), nil)
 }
 
