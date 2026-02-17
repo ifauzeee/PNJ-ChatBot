@@ -36,6 +36,8 @@ type Config struct {
 	AutoBanReportCount int
 
 	MaintenanceAccountID int64
+	SightengineAPIUser   string
+	SightengineAPISecret string
 }
 
 func Load() *Config {
@@ -64,6 +66,8 @@ func Load() *Config {
 		MaxReportsPerDay:      getEnvInt("MAX_REPORTS_PER_DAY", 5),
 		AutoBanReportCount:    getEnvInt("AUTO_BAN_REPORT_COUNT", 3),
 		MaintenanceAccountID:  getEnvInt64("MAINTENANCE_ID", 0),
+		SightengineAPIUser:    getEnv("SIGHTENGINE_API_USER", ""),
+		SightengineAPISecret:  getEnv("SIGHTENGINE_API_SECRET", ""),
 	}
 
 	if cfg.BotToken == "" {

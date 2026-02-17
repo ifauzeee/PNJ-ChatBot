@@ -201,30 +201,40 @@ func (b *Bot) handleChatMessage(msg *tgbotapi.Message) {
 
 	if msg.Text != "" {
 		b.sendMessage(partnerID, fmt.Sprintf("💬 *Stranger:*\n%s", escapeMarkdown(msg.Text)), nil)
-	} else if msg.Sticker != nil {
-		stickerCfg := tgbotapi.StickerConfig{
-			BaseFile: tgbotapi.BaseFile{
-				BaseChat: tgbotapi.BaseChat{ChatID: partnerID},
-				File:     tgbotapi.FileID(msg.Sticker.FileID),
-			},
+	} else if msg.Sticker != nil || msg.Photo != nil || msg.Animation != nil {
+		if safe, reason := b.isSafeMedia(msg); !safe {
+			b.sendMessage(telegramID, "🚫 *Konten diblokir:* "+reason, nil)
+			return
 		}
-		b.api.Send(stickerCfg)
-	} else if msg.Photo != nil {
-		photos := msg.Photo
-		photo := photos[len(photos)-1]
-		photoMsg := tgbotapi.NewPhoto(partnerID, tgbotapi.FileID(photo.FileID))
-		photoMsg.Caption = "🖼️ *Foto Sekali Lihat* (Akan terhapus dalam 10 detik)"
-		if msg.Caption != "" {
-			photoMsg.Caption += "\n\n💬 Stranger: " + msg.Caption
-		}
-		photoMsg.ParseMode = "Markdown"
-		sentMsg, _ := b.api.Send(photoMsg)
 
-		go func(chatID int64, messageID int) {
-			time.Sleep(10 * time.Second)
-			deleteMsg := tgbotapi.NewDeleteMessage(chatID, messageID)
-			b.api.Send(deleteMsg)
-		}(partnerID, sentMsg.MessageID)
+		if msg.Sticker != nil {
+			stickerCfg := tgbotapi.StickerConfig{
+				BaseFile: tgbotapi.BaseFile{
+					BaseChat: tgbotapi.BaseChat{ChatID: partnerID},
+					File:     tgbotapi.FileID(msg.Sticker.FileID),
+				},
+			}
+			b.api.Send(stickerCfg)
+		} else if msg.Photo != nil {
+			photos := msg.Photo
+			photo := photos[len(photos)-1]
+			photoMsg := tgbotapi.NewPhoto(partnerID, tgbotapi.FileID(photo.FileID))
+			photoMsg.Caption = "🖼️ *Foto Sekali Lihat* (Akan terhapus dalam 10 detik)"
+			if msg.Caption != "" {
+				photoMsg.Caption += "\n\n💬 Stranger: " + msg.Caption
+			}
+			photoMsg.ParseMode = "Markdown"
+			sentMsg, _ := b.api.Send(photoMsg)
+
+			go func(chatID int64, messageID int) {
+				time.Sleep(10 * time.Second)
+				deleteMsg := tgbotapi.NewDeleteMessage(chatID, messageID)
+				b.api.Send(deleteMsg)
+			}(partnerID, sentMsg.MessageID)
+		} else if msg.Animation != nil {
+			anim := tgbotapi.NewAnimation(partnerID, tgbotapi.FileID(msg.Animation.FileID))
+			b.api.Send(anim)
+		}
 	} else if msg.Voice != nil {
 		voice := tgbotapi.NewVoice(partnerID, tgbotapi.FileID(msg.Voice.FileID))
 		b.api.Send(voice)
@@ -248,9 +258,6 @@ func (b *Bot) handleChatMessage(msg *tgbotapi.Message) {
 			doc.Caption = fmt.Sprintf("💬 Stranger: %s", msg.Caption)
 		}
 		b.api.Send(doc)
-	} else if msg.Animation != nil {
-		anim := tgbotapi.NewAnimation(partnerID, tgbotapi.FileID(msg.Animation.FileID))
-		b.api.Send(anim)
 	} else if msg.VideoNote != nil {
 		vnCfg := tgbotapi.VideoNoteConfig{
 			BaseFile: tgbotapi.BaseFile{

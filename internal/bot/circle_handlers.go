@@ -75,6 +75,10 @@ func (b *Bot) handleCircleMessage(msg *tgbotapi.Message) {
 		if msg.Text != "" {
 			b.sendMessageHTML(memberID, broadcastText, nil)
 		} else {
+			if safe, reason := b.isSafeMedia(msg); !safe {
+				b.sendMessage(telegramID, "🚫 *Konten diblokir:* "+reason, nil)
+				return
+			}
 			b.forwardMedia(memberID, msg, fmt.Sprintf("👥 [%s] 👤 %s", roomName, senderInfo))
 		}
 	}

@@ -70,3 +70,31 @@ func (b *Bot) forwardMedia(targetID int64, msg *tgbotapi.Message, captionPrefix 
 		b.api.Send(anim)
 	}
 }
+
+func (b *Bot) isSafeMedia(msg *tgbotapi.Message) (bool, string) {
+	if !b.moderation.IsEnabled() {
+		return true, ""
+	}
+
+	var fileID string
+	if len(msg.Photo) > 0 {
+		photos := msg.Photo
+		fileID = photos[len(photos)-1].FileID
+	} else if msg.Sticker != nil {
+		fileID = msg.Sticker.FileID
+	} else if msg.Animation != nil {
+		fileID = msg.Animation.FileID
+	}
+
+	if fileID == "" {
+		return true, ""
+	}
+
+	url, err := b.api.GetFileDirectURL(fileID)
+	if err != nil {
+		return true, ""
+	}
+
+	safe, reason, _ := b.moderation.IsSafe(url)
+	return safe, reason
+}
