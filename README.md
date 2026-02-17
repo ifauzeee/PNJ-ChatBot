@@ -2,7 +2,7 @@
 
 > Bot Telegram anonim khusus untuk mahasiswa **Politeknik Negeri Jakarta**
 
-[![Go](https://img.shields.io/badge/Go-1.22+-00ADD8?style=flat-square&logo=go&logoColor=white)](https://golang.org)
+[![Go](https://img.shields.io/badge/Go-1.24+-00ADD8?style=flat-square&logo=go&logoColor=white)](https://golang.org)
 [![Telegram Bot API](https://img.shields.io/badge/Telegram-Bot%20API-26A5E4?style=flat-square&logo=telegram&logoColor=white)](https://core.telegram.org/bots/api)
 [![SQLite](https://img.shields.io/badge/SQLite-Database-003B57?style=flat-square&logo=sqlite&logoColor=white)](https://sqlite.org)
 
@@ -58,7 +58,7 @@
 ## 🚀 Quick Start
 
 ### Prerequisites
-- Go 1.22+
+- Go 1.24+
 - Telegram Bot Token (dari [@BotFather](https://t.me/BotFather))
 - SMTP Email (Gmail dengan App Password)
 
@@ -79,6 +79,8 @@ cp .env.example .env
 ```env
 BOT_TOKEN=your_telegram_bot_token
 LOG_LEVEL=info
+MAX_UPDATE_WORKERS=16
+MAX_UPDATE_QUEUE=256
 SMTP_HOST=smtp.gmail.com
 SMTP_PORT=587
 SMTP_USERNAME=your_email@gmail.com
@@ -118,14 +120,14 @@ pnj-anonymous-bot/
 │   ├── database/
 │   │   ├── database.go          # DB setup & migrations
 │   │   ├── user.go              # User CRUD
-│   │   ├── chat.go              # Chat & queue operations
+│   │   ├── chat.go              # Chat session operations
 │   │   ├── confession.go        # Confession CRUD
 │   │   └── report.go            # Reports, blocks, OTP
 │   ├── email/sender.go          # SMTP email sender
 │   ├── models/models.go         # Data models
 │   └── service/
 │       ├── auth.go              # Authentication logic
-│       ├── chat.go              # Chat matching
+│       ├── chat.go              # Chat matching (Redis queue)
 │       ├── confession.go        # Confession logic
 │       └── profile.go           # Profile management
 ├── .env.example
