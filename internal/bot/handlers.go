@@ -2,6 +2,7 @@ package bot
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/pnj-anonymous-bot/internal/models"
@@ -465,6 +466,37 @@ func (b *Bot) handleConfessions(msg *tgbotapi.Message) {
 	header += "\n_React ke confession: ketik_ /react <id> <emoji>"
 
 	b.sendMessage(telegramID, header, nil)
+}
+
+func (b *Bot) handleReact(msg *tgbotapi.Message) {
+	telegramID := msg.From.ID
+	args := msg.CommandArguments()
+
+	if args == "" {
+		b.sendMessage(telegramID, "💡 Cara menggunakan: `/react <id> <emoji>`\nContoh: `/react 1 ❤️`", nil)
+		return
+	}
+
+	parts := strings.Fields(args)
+	if len(parts) < 2 {
+		b.sendMessage(telegramID, "⚠️ Format salah. Contoh: `/react 1 ❤️`", nil)
+		return
+	}
+
+	confessionID, err := strconv.ParseInt(parts[0], 10, 64)
+	if err != nil {
+		b.sendMessage(telegramID, "⚠️ ID confession harus berupa angka.", nil)
+		return
+	}
+
+	reaction := parts[1]
+	err = b.confession.ReactToConfession(confessionID, telegramID, reaction)
+	if err != nil {
+		b.sendMessage(telegramID, fmt.Sprintf("❌ %s", err.Error()), nil)
+		return
+	}
+
+	b.sendMessage(telegramID, fmt.Sprintf("✅ Berhasil menambahkan reaksi %s ke confession #%d", reaction, confessionID), nil)
 }
 
 func (b *Bot) handleWhisper(msg *tgbotapi.Message) {
