@@ -2,7 +2,6 @@ package database
 
 import (
 	"fmt"
-	"log"
 	"os"
 	"strings"
 	"time"
@@ -10,6 +9,8 @@ import (
 	"github.com/Masterminds/squirrel"
 	"github.com/jmoiron/sqlx"
 	_ "github.com/lib/pq"
+	"github.com/pnj-anonymous-bot/internal/logger"
+	"go.uber.org/zap"
 	_ "modernc.org/sqlite"
 )
 
@@ -69,7 +70,7 @@ func New() (*DB, error) {
 		return nil, fmt.Errorf("failed to run migrations: %w", err)
 	}
 
-	log.Printf("✅ [%s] Database connected successfully", dbType)
+	logger.Info("✅ Database connected successfully", zap.String("type", dbType))
 	return d, nil
 }
 

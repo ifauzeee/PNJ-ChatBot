@@ -3,11 +3,12 @@ package service
 import (
 	"context"
 	"fmt"
-	"log"
 	"os"
 	"strings"
 
+	"github.com/pnj-anonymous-bot/internal/logger"
 	"github.com/redis/go-redis/v9"
+	"go.uber.org/zap"
 )
 
 type RedisService struct {
@@ -28,9 +29,9 @@ func NewRedisService() *RedisService {
 	ctx := context.Background()
 	_, err := client.Ping(ctx).Result()
 	if err != nil {
-		log.Printf("⚠️ Redis connection failed: %v", err)
+		logger.Warn("⚠️ Redis connection failed", zap.Error(err))
 	} else {
-		log.Println("✅ Redis connected successfully")
+		logger.Info("✅ Redis connected successfully")
 	}
 
 	return &RedisService{

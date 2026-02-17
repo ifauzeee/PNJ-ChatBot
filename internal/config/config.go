@@ -1,11 +1,11 @@
 package config
 
 import (
-	"log"
 	"os"
 	"strconv"
 
 	"github.com/joho/godotenv"
+	"github.com/pnj-anonymous-bot/internal/logger"
 )
 
 type Config struct {
@@ -36,7 +36,7 @@ type Config struct {
 func Load() *Config {
 
 	if err := godotenv.Load(); err != nil {
-		log.Println("⚠️  No .env file found, using environment variables")
+		logger.Warn("⚠️ No .env file found, using environment variables")
 	}
 
 	cfg := &Config{
@@ -59,7 +59,7 @@ func Load() *Config {
 	}
 
 	if cfg.BotToken == "" {
-		log.Fatal("❌ BOT_TOKEN is required! Set it in .env or environment variables.")
+		logger.Fatal("❌ BOT_TOKEN is required! Set it in .env or environment variables.")
 	}
 
 	return cfg

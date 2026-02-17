@@ -2,14 +2,15 @@ package service
 
 import (
 	"fmt"
-	"log"
 	"strings"
 	"time"
 
 	"github.com/pnj-anonymous-bot/internal/config"
 	"github.com/pnj-anonymous-bot/internal/database"
 	"github.com/pnj-anonymous-bot/internal/email"
+	"github.com/pnj-anonymous-bot/internal/logger"
 	"github.com/pnj-anonymous-bot/internal/models"
+	"go.uber.org/zap"
 )
 
 type AuthService struct {
@@ -61,11 +62,17 @@ func (s *AuthService) InitiateVerification(telegramID int64, emailAddr string) e
 	}
 
 	if err := s.email.SendOTP(emailAddr, code); err != nil {
-		log.Printf("❌ Failed to send OTP email to %s: %v", emailAddr, err)
+		logger.Error("❌ Failed to send OTP email",
+			zap.String("email", emailAddr),
+			zap.Error(err),
+		)
 		return fmt.Errorf("gagal mengirim email verifikasi. Pastikan email kamu valid dan coba lagi")
 	}
 
-	log.Printf("📧 OTP sent to %s for user %d", emailAddr, telegramID)
+	logger.Info("📧 OTP sent",
+		zap.String("email", emailAddr),
+		zap.Int64("user_id", telegramID),
+	)
 	return nil
 }
 
@@ -92,7 +99,10 @@ func (s *AuthService) VerifyOTP(telegramID int64, code string) (bool, error) {
 		return false, err
 	}
 
-	log.Printf("✅ User %d verified with email %s", telegramID, verifiedEmail)
+	logger.Info("✅ User verified",
+		zap.Int64("user_id", telegramID),
+		zap.String("email", verifiedEmail),
+	)
 	return true, nil
 }
 

@@ -3,10 +3,11 @@ package service
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 
 	"github.com/pnj-anonymous-bot/internal/database"
+	"github.com/pnj-anonymous-bot/internal/logger"
 	"github.com/pnj-anonymous-bot/internal/models"
+	"go.uber.org/zap"
 )
 
 type QueueItem struct {
@@ -60,7 +61,10 @@ func (s *ChatService) SearchPartner(telegramID int64, preferredDept, preferredGe
 			s.db.SetUserState(telegramID, models.StateInChat, "")
 			s.db.SetUserState(item.TelegramID, models.StateInChat, "")
 
-			log.Printf("💬 Chat matched (Redis): %d <-> %d", telegramID, item.TelegramID)
+			logger.Info("💬 Chat matched",
+				zap.Int64("user1", telegramID),
+				zap.Int64("user2", item.TelegramID),
+			)
 			return item.TelegramID, nil
 		}
 	}
@@ -75,7 +79,7 @@ func (s *ChatService) SearchPartner(telegramID int64, preferredDept, preferredGe
 	s.redis.client.RPush(s.redis.ctx, queueKey, raw)
 
 	s.db.SetUserState(telegramID, models.StateSearching, "")
-	log.Printf("🔍 User %d added to queue (Redis)", telegramID)
+	logger.Info("🔍 Added to queue", zap.Int64("user_id", telegramID))
 	return 0, nil
 }
 

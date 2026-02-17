@@ -3,7 +3,6 @@ package bot
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 	"runtime"
 	"time"
@@ -11,9 +10,11 @@ import (
 	"github.com/pnj-anonymous-bot/internal/config"
 	"github.com/pnj-anonymous-bot/internal/database"
 	"github.com/pnj-anonymous-bot/internal/email"
+	"github.com/pnj-anonymous-bot/internal/logger"
 	"github.com/pnj-anonymous-bot/internal/models"
 	"github.com/pnj-anonymous-bot/internal/service"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"go.uber.org/zap"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
@@ -53,7 +54,7 @@ func New(cfg *config.Config, db *database.DB) (*Bot, error) {
 		startedAt:  time.Now(),
 	}
 
-	log.Printf("🤖 Bot authorized as @%s", api.Self.UserName)
+	logger.Info("🤖 Bot authorized", zap.String("username", api.Self.UserName))
 	return bot, nil
 }
 
@@ -118,9 +119,9 @@ func (b *Bot) startHealthServer() {
 		IdleTimeout:  30 * time.Second,
 	}
 
-	log.Println("🏥 Health check server listening on :8080")
+	logger.Info("🏥 Health check server listening on :8080")
 	if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-		log.Printf("⚠️  Health check server error: %v", err)
+		logger.Error("⚠️ Health check server error", zap.Error(err))
 	}
 }
 
@@ -130,7 +131,7 @@ func (b *Bot) startQueueWorker() {
 		for range ticker.C {
 			updatedIDs, err := b.chat.ProcessQueueTimeout(60)
 			if err != nil {
-				log.Printf("⚠️ Queue worker error: %v", err)
+				logger.Error("⚠️ Queue worker error", zap.Error(err))
 				continue
 			}
 
@@ -147,7 +148,7 @@ _Mohon tunggu sebentar ya..._`
 }
 
 func (b *Bot) Start() {
-	log.Println("🚀 Starting PNJ Anonymous Bot...")
+	logger.Info("🚀 Starting PNJ Anonymous Bot...")
 
 	go b.startHealthServer()
 	b.startQueueWorker()
@@ -191,7 +192,7 @@ func (b *Bot) Start() {
 func (b *Bot) handleUpdate(update tgbotapi.Update) {
 	defer func() {
 		if r := recover(); r != nil {
-			log.Printf("❌ Panic recovered: %v", r)
+			logger.Error("❌ Panic recovered", zap.Any("recover", r))
 		}
 	}()
 
@@ -287,7 +288,7 @@ func (b *Bot) handleMessage(msg *tgbotapi.Message) {
 
 	state, stateData, err := b.db.GetUserState(telegramID)
 	if err != nil {
-		log.Printf("Error getting user state: %v", err)
+		logger.Error("Error getting user state", zap.Int64("telegram_id", telegramID), zap.Error(err))
 		return
 	}
 
@@ -360,7 +361,7 @@ func (b *Bot) sendMessage(chatID int64, text string, keyboard *tgbotapi.InlineKe
 	}
 
 	if _, err := b.api.Send(msg); err != nil {
-		log.Printf("Error sending message to %d: %v", chatID, err)
+		logger.Error("Error sending message", zap.Int64("chat_id", chatID), zap.Error(err))
 	}
 }
 
@@ -372,13 +373,13 @@ func (b *Bot) sendMessageHTML(chatID int64, text string, keyboard *tgbotapi.Inli
 	}
 
 	if _, err := b.api.Send(msg); err != nil {
-		log.Printf("Error sending HTML message to %d: %v", chatID, err)
+		logger.Error("Error sending HTML message", zap.Int64("chat_id", chatID), zap.Error(err))
 	}
 }
 
 func (b *Bot) answerCallback(callbackID string, text string) {
 	callback := tgbotapi.NewCallback(callbackID, text)
 	if _, err := b.api.Request(callback); err != nil {
-		log.Printf("Error answering callback: %v", err)
+		logger.Error("Error answering callback", zap.String("callback_id", callbackID), zap.Error(err))
 	}
 }

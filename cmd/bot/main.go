@@ -1,7 +1,6 @@
 package main
 
 import (
-	"log"
 	"os"
 	"os/signal"
 	"syscall"
@@ -9,10 +8,13 @@ import (
 	"github.com/pnj-anonymous-bot/internal/bot"
 	"github.com/pnj-anonymous-bot/internal/config"
 	"github.com/pnj-anonymous-bot/internal/database"
+	"github.com/pnj-anonymous-bot/internal/logger"
+	"go.uber.org/zap"
 )
 
 func main() {
-	log.SetFlags(log.LstdFlags | log.Lshortfile)
+	logger.Init()
+	defer logger.Log.Sync()
 
 	banner := `
 ╔══════════════════════════════════════════════════╗
@@ -26,22 +28,22 @@ func main() {
 ║                                                  ║
 ╚══════════════════════════════════════════════════╝
 `
-	log.Println(banner)
+	logger.Info(banner)
 
-	log.Println("📋 Loading configuration...")
+	logger.Info("📋 Loading configuration...")
 	cfg := config.Load()
 
-	log.Println("🗄️  Initializing database...")
+	logger.Info("🗄️  Initializing database...")
 	db, err := database.New()
 	if err != nil {
-		log.Fatalf("❌ Failed to initialize database: %v", err)
+		logger.Fatal("❌ Failed to initialize database", zap.Error(err))
 	}
 	defer db.Close()
 
-	log.Println("🤖 Creating bot instance...")
+	logger.Info("🤖 Creating bot instance...")
 	b, err := bot.New(cfg, db)
 	if err != nil {
-		log.Fatalf("❌ Failed to create bot: %v", err)
+		logger.Fatal("❌ Failed to create bot", zap.Error(err))
 	}
 
 	quit := make(chan os.Signal, 1)
@@ -49,7 +51,7 @@ func main() {
 
 	go func() {
 		<-quit
-		log.Println("\n🛑 Shutting down gracefully...")
+		logger.Info("🛑 Shutting down gracefully...")
 		db.Close()
 		os.Exit(0)
 	}()

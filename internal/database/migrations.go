@@ -3,13 +3,14 @@ package database
 import (
 	"embed"
 	"fmt"
-	"log"
 
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database/postgres"
 	"github.com/golang-migrate/migrate/v4/database/sqlite"
 	"github.com/golang-migrate/migrate/v4/source/iofs"
 	"github.com/jmoiron/sqlx"
+	"github.com/pnj-anonymous-bot/internal/logger"
+	"go.uber.org/zap"
 )
 
 //go:embed all:migrations
@@ -54,6 +55,6 @@ func runMigrations(db *sqlx.DB, dbType string) error {
 		return fmt.Errorf("failed to run migrations: %w", err)
 	}
 
-	log.Printf("✅ [%s] Migrations applied successfully", dbType)
+	logger.Info("✅ Migrations applied successfully", zap.String("type", dbType))
 	return nil
 }

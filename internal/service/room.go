@@ -2,12 +2,13 @@ package service
 
 import (
 	"fmt"
-	"log"
 	"regexp"
 	"strings"
 
 	"github.com/pnj-anonymous-bot/internal/database"
+	"github.com/pnj-anonymous-bot/internal/logger"
 	"github.com/pnj-anonymous-bot/internal/models"
+	"go.uber.org/zap"
 )
 
 type RoomService struct {
@@ -64,7 +65,10 @@ func (s *RoomService) JoinRoom(telegramID int64, slug string) (*models.Room, err
 		return nil, err
 	}
 
-	log.Printf("👥 User %d joined circle %s", telegramID, slug)
+	logger.Info("👥 User joined circle",
+		zap.Int64("user_id", telegramID),
+		zap.String("slug", slug),
+	)
 	return room, nil
 }
 
@@ -79,7 +83,7 @@ func (s *RoomService) LeaveRoom(telegramID int64) error {
 		return err
 	}
 
-	log.Printf("👋 User %d cleared from all circles", telegramID)
+	logger.Info("👋 User left circle", zap.Int64("user_id", telegramID))
 	return nil
 }
 
