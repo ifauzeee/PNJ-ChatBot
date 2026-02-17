@@ -216,3 +216,45 @@ type PollOption struct {
 	OptionText string `json:"option_text"`
 	VoteCount  int    `json:"vote_count"`
 }
+
+type Achievement struct {
+	Key         string
+	Name        string
+	Description string
+	Icon        string
+}
+
+func GetAchievements() map[string]Achievement {
+	return map[string]Achievement{
+		"CHAT_MARATHON": {
+			Key:         "CHAT_MARATHON",
+			Name:        "Chat Marathon",
+			Description: "Chatting selama lebih dari 1 jam tanpa henti.",
+			Icon:        "🏃",
+		},
+		"POPULAR_AUTHOR": {
+			Key:         "POPULAR_AUTHOR",
+			Name:        "Penulis Populer",
+			Description: "Confession mendapatkan lebih dari 5 reaksi.",
+			Icon:        "🌟",
+		},
+		"KARMA_MASTER": {
+			Key:         "KARMA_MASTER",
+			Name:        "Karma Master",
+			Description: "Mencapai lebih dari 50 poin Karma.",
+			Icon:        "👑",
+		},
+		"POLL_MAKER": {
+			Key:         "POLL_MAKER",
+			Name:        "Pembuat Aspirasi",
+			Description: "Membuat lebih dari 3 polling.",
+			Icon:        "🗳️",
+		},
+	}
+}
+
+type UserAchievement struct {
+	TelegramID     int64
+	AchievementKey string
+	EarnedAt       time.Time
+}

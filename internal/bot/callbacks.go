@@ -373,6 +373,12 @@ func (b *Bot) handleReactionCallback(telegramID int64, data string, callback *tg
 		return
 	}
 
+	confession, _ := b.db.GetConfession(confessionID)
+	if confession != nil {
+		b.checkAchievements(confession.AuthorID)
+	}
+	b.checkAchievements(telegramID)
+
 	counts, _ := b.confession.GetReactionCounts(confessionID)
 	newKb := ConfessionReactionKeyboard(confessionID, counts)
 

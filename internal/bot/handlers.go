@@ -328,18 +328,26 @@ func (b *Bot) handleStop(msg *tgbotapi.Message) {
 		return
 	}
 
-	partnerID, err := b.chat.StopChat(telegramID)
-	if err != nil {
-		b.sendMessage(telegramID, "⚠️ Tidak ada chat aktif saat ini.", nil)
+	session, _ := b.db.GetActiveSession(telegramID)
+	if session == nil {
+		b.sendMessageHTML(telegramID, "⚠️ <b>Tidak ada chat aktif saat ini.</b>", nil)
 		return
 	}
 
-	if partnerID > 0 {
-		b.sendMessage(partnerID, "👋 *Partner kamu telah memutus chat.*\n\nGunakan /search untuk mencari partner baru.", nil)
-		b.sendMessage(telegramID, "🛑 *Chat dihentikan.*\n\nGunakan /search untuk cari partner baru.", nil)
-	} else {
-		b.sendMessage(telegramID, "💡 Tidak ada chat aktif saat ini.", nil)
+	partnerID, err := b.chat.StopChat(telegramID)
+	if err != nil {
+		b.sendMessageHTML(telegramID, "❌ Gagal menghentikan chat.", nil)
+		return
 	}
+
+	duration := time.Since(session.StartedAt).Minutes()
+	b.checkChatMarathon(session.User1ID, duration)
+	b.checkChatMarathon(session.User2ID, duration)
+	b.checkAchievements(session.User1ID)
+	b.checkAchievements(session.User2ID)
+
+	b.sendMessageHTML(partnerID, "👋 <b>Partner telah menghentikan chat.</b>", nil)
+	b.sendMessageHTML(telegramID, "🛑 <b>Chat dihentikan.</b>\nKetik /search untuk mencari partner baru.", nil)
 }
 
 func (b *Bot) handleChatMessage(msg *tgbotapi.Message) {
@@ -575,7 +583,10 @@ func (b *Bot) handleReply(msg *tgbotapi.Message) {
 	confession, _ := b.db.GetConfession(confessionID)
 	if confession != nil && confession.AuthorID != telegramID {
 		b.db.IncrementUserKarma(confession.AuthorID, 1)
+		b.checkAchievements(confession.AuthorID)
 	}
+
+	b.checkAchievements(telegramID)
 
 	b.sendMessage(telegramID, fmt.Sprintf("✅ Berhasil membalas confession #%d", confessionID), nil)
 }
@@ -663,6 +674,7 @@ Contoh: <code>/poll Setuju gak harga parkir naik? | Setuju | Tidak Setuju</code>
 	}
 
 	b.db.IncrementUserKarma(telegramID, 3)
+	b.checkAchievements(telegramID)
 
 	b.sendMessageHTML(telegramID, fmt.Sprintf("✅ <b>Polling #%d berhasil dibuat!</b>\nSemua mahasiswa sekarang bisa memberikan suara secara anonim.", pollID), nil)
 }
@@ -796,6 +808,19 @@ func (b *Bot) handleProfile(msg *tgbotapi.Message) {
 
 	totalChats, totalConfessions, totalReactions, daysSince, _ := b.profile.GetStats(telegramID)
 
+	earned, _ := b.db.GetUserAchievements(telegramID)
+	badgeStr := ""
+	if len(earned) > 0 {
+		badgeStr = "\n🏆 <b>Lencana:</b> "
+		allAch := models.GetAchievements()
+		for _, ua := range earned {
+			if ach, ok := allAch[ua.AchievementKey]; ok {
+				badgeStr += ach.Icon + " "
+			}
+		}
+		badgeStr += "\n"
+	}
+
 	profileText := fmt.Sprintf(`<b>👤 Profil Kamu</b>
 
 ━━━━━━━━━━━━━━━━━━━
@@ -810,7 +835,7 @@ func (b *Bot) handleProfile(msg *tgbotapi.Message) {
 💬 Total Chat: <b>%d</b>
 📝 Confessions: <b>%d</b>
 ❤️ Reactions Diterima: <b>%d</b>
-📅 Hari Aktif: <b>%d</b>
+📅 Hari Aktif: <b>%d</b>%s
 ━━━━━━━━━━━━━━━━━━━
 ⚠️ Report Count: %d/3`,
 		html.EscapeString(user.DisplayName),
@@ -823,6 +848,7 @@ func (b *Bot) handleProfile(msg *tgbotapi.Message) {
 		totalConfessions,
 		totalReactions,
 		daysSince,
+		badgeStr,
 		user.ReportCount,
 	)
 

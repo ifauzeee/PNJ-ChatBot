@@ -95,13 +95,9 @@ func (s *ChatService) StopChat(telegramID int64) (int64, error) {
 		return 0, nil
 	}
 
-	if err := s.db.EndChatSession(session.ID); err != nil {
+	partnerID, err := s.db.StopChat(telegramID)
+	if err != nil {
 		return 0, err
-	}
-
-	partnerID := session.User2ID
-	if session.User1ID != telegramID {
-		partnerID = session.User1ID
 	}
 
 	s.db.SetUserState(telegramID, models.StateNone, "")

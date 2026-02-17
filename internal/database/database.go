@@ -183,6 +183,14 @@ func (d *DB) migrate() error {
 			FOREIGN KEY (poll_id) REFERENCES polls(id) ON DELETE CASCADE,
 			FOREIGN KEY (telegram_id) REFERENCES users(telegram_id)
 		)`,
+		`CREATE TABLE IF NOT EXISTS user_achievements (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			telegram_id INTEGER NOT NULL,
+			achievement_key TEXT NOT NULL,
+			earned_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			UNIQUE(telegram_id, achievement_key),
+			FOREIGN KEY (telegram_id) REFERENCES users(telegram_id)
+		)`,
 
 		`CREATE INDEX IF NOT EXISTS idx_users_telegram_id ON users(telegram_id)`,
 		`CREATE INDEX IF NOT EXISTS idx_users_department ON users(department)`,
