@@ -4,7 +4,9 @@ import (
 	"fmt"
 	"html"
 
+	"github.com/pnj-anonymous-bot/internal/logger"
 	"github.com/pnj-anonymous-bot/internal/models"
+	"go.uber.org/zap"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
@@ -14,6 +16,7 @@ func (b *Bot) handleStart(msg *tgbotapi.Message) {
 
 	user, err := b.auth.RegisterUser(telegramID)
 	if err != nil {
+		logger.Error("❌ Failed to register user", zap.Int64("telegram_id", telegramID), zap.Error(err))
 		b.sendMessage(telegramID, "❌ Terjadi kesalahan. Coba lagi nanti.", nil)
 		return
 	}

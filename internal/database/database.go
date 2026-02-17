@@ -1,6 +1,7 @@
 package database
 
 import (
+	"database/sql"
 	"fmt"
 	"os"
 	"strings"
@@ -112,6 +113,26 @@ func (d *DB) PrepareQuery(query string) string {
 		}
 	}
 	return query
+}
+
+func (d *DB) Exec(query string, args ...interface{}) (sql.Result, error) {
+	return d.DB.Exec(d.PrepareQuery(query), args...)
+}
+
+func (d *DB) Query(query string, args ...interface{}) (*sql.Rows, error) {
+	return d.DB.Query(d.PrepareQuery(query), args...)
+}
+
+func (d *DB) QueryRow(query string, args ...interface{}) *sql.Row {
+	return d.DB.QueryRow(d.PrepareQuery(query), args...)
+}
+
+func (d *DB) Get(dest interface{}, query string, args ...interface{}) error {
+	return d.DB.Get(dest, d.PrepareQuery(query), args...)
+}
+
+func (d *DB) Select(dest interface{}, query string, args ...interface{}) error {
+	return d.DB.Select(dest, d.PrepareQuery(query), args...)
 }
 
 func (d *DB) InsertGetID(query string, pkColumn string, args ...interface{}) (int64, error) {

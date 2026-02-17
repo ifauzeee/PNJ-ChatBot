@@ -83,20 +83,20 @@ func IsValidGender(g string) bool {
 }
 
 type User struct {
-	ID          int64      `json:"id"`
-	TelegramID  int64      `json:"telegram_id"`
-	Email       string     `json:"email"`
-	Gender      Gender     `json:"gender"`
-	Department  Department `json:"department"`
-	Year        int        `json:"year"`
-	DisplayName string     `json:"display_name"`
-	Karma       int        `json:"karma"`
-	IsVerified  bool       `json:"is_verified"`
-	IsBanned    bool       `json:"is_banned"`
-	ReportCount int        `json:"report_count"`
-	TotalChats  int        `json:"total_chats"`
-	CreatedAt   time.Time  `json:"created_at"`
-	UpdatedAt   time.Time  `json:"updated_at"`
+	ID          int64      `json:"id" db:"id"`
+	TelegramID  int64      `json:"telegram_id" db:"telegram_id"`
+	Email       string     `json:"email" db:"email"`
+	Gender      Gender     `json:"gender" db:"gender"`
+	Department  Department `json:"department" db:"department"`
+	Year        int        `json:"year" db:"year"`
+	DisplayName string     `json:"display_name" db:"display_name"`
+	Karma       int        `json:"karma" db:"karma"`
+	IsVerified  bool       `json:"is_verified" db:"is_verified"`
+	IsBanned    bool       `json:"is_banned" db:"is_banned"`
+	ReportCount int        `json:"report_count" db:"report_count"`
+	TotalChats  int        `json:"total_chats" db:"total_chats"`
+	CreatedAt   time.Time  `json:"created_at" db:"created_at"`
+	UpdatedAt   time.Time  `json:"updated_at" db:"updated_at"`
 }
 
 type UserState string
@@ -121,80 +121,80 @@ const (
 )
 
 type Room struct {
-	ID          int64     `json:"id"`
-	Slug        string    `json:"slug"`
-	Name        string    `json:"name"`
-	Description string    `json:"description"`
-	MemberCount int       `json:"member_count"`
-	IsActive    bool      `json:"is_active"`
-	CreatedAt   time.Time `json:"created_at"`
+	ID          int64     `json:"id" db:"id"`
+	Slug        string    `json:"slug" db:"slug"`
+	Name        string    `json:"name" db:"name"`
+	Description string    `json:"description" db:"description"`
+	MemberCount int       `json:"member_count" db:"member_count"`
+	IsActive    bool      `json:"is_active" db:"is_active"`
+	CreatedAt   time.Time `json:"created_at" db:"created_at"`
 }
 
 type RoomMember struct {
-	ID         int64     `json:"id"`
-	RoomID     int64     `json:"room_id"`
-	TelegramID int64     `json:"telegram_id"`
-	JoinedAt   time.Time `json:"joined_at"`
+	ID         int64     `json:"id" db:"id"`
+	RoomID     int64     `json:"room_id" db:"room_id"`
+	TelegramID int64     `json:"telegram_id" db:"telegram_id"`
+	JoinedAt   time.Time `json:"joined_at" db:"joined_at"`
 }
 
 type VerificationCode struct {
-	ID         int64     `json:"id"`
-	TelegramID int64     `json:"telegram_id"`
-	Email      string    `json:"email"`
-	Code       string    `json:"code"`
-	ExpiresAt  time.Time `json:"expires_at"`
-	CreatedAt  time.Time `json:"created_at"`
+	ID         int64     `json:"id" db:"id"`
+	TelegramID int64     `json:"telegram_id" db:"telegram_id"`
+	Email      string    `json:"email" db:"email"`
+	Code       string    `json:"code" db:"code"`
+	ExpiresAt  time.Time `json:"expires_at" db:"expires_at"`
+	CreatedAt  time.Time `json:"created_at" db:"created_at"`
 }
 
 type ChatSession struct {
-	ID        int64      `json:"id"`
-	User1ID   int64      `json:"user1_id"`
-	User2ID   int64      `json:"user2_id"`
-	IsActive  bool       `json:"is_active"`
-	StartedAt time.Time  `json:"started_at"`
-	EndedAt   *time.Time `json:"ended_at"`
+	ID        int64      `json:"id" db:"id"`
+	User1ID   int64      `json:"user1_id" db:"user1_id"`
+	User2ID   int64      `json:"user2_id" db:"user2_id"`
+	IsActive  bool       `json:"is_active" db:"is_active"`
+	StartedAt time.Time  `json:"started_at" db:"started_at"`
+	EndedAt   *time.Time `json:"ended_at" db:"ended_at"`
 }
 
 type ChatQueue struct {
-	ID              int64     `json:"id"`
-	TelegramID      int64     `json:"telegram_id"`
-	PreferredDept   string    `json:"preferred_dept"`
-	PreferredGender string    `json:"preferred_gender"`
-	PreferredYear   int       `json:"preferred_year"`
-	JoinedAt        time.Time `json:"joined_at"`
+	ID              int64     `json:"id" db:"id"`
+	TelegramID      int64     `json:"telegram_id" db:"telegram_id"`
+	PreferredDept   string    `json:"preferred_dept" db:"preferred_dept"`
+	PreferredGender string    `json:"preferred_gender" db:"preferred_gender"`
+	PreferredYear   int       `json:"preferred_year" db:"preferred_year"`
+	JoinedAt        time.Time `json:"joined_at" db:"joined_at"`
 }
 
 type Confession struct {
-	ID         int64     `json:"id"`
-	AuthorID   int64     `json:"author_id"`
-	Content    string    `json:"content"`
-	LikeCount  int       `json:"like_count"`
-	Department string    `json:"department"`
-	CreatedAt  time.Time `json:"created_at"`
+	ID         int64     `json:"id" db:"id"`
+	AuthorID   int64     `json:"author_id" db:"author_id"`
+	Content    string    `json:"content" db:"content"`
+	LikeCount  int       `json:"like_count" db:"like_count"`
+	Department string    `json:"department" db:"department"`
+	CreatedAt  time.Time `json:"created_at" db:"created_at"`
 }
 
 type ConfessionReaction struct {
-	ID           int64     `json:"id"`
-	ConfessionID int64     `json:"confession_id"`
-	TelegramID   int64     `json:"telegram_id"`
-	Reaction     string    `json:"reaction"`
-	CreatedAt    time.Time `json:"created_at"`
+	ID           int64     `json:"id" db:"id"`
+	ConfessionID int64     `json:"confession_id" db:"confession_id"`
+	TelegramID   int64     `json:"telegram_id" db:"telegram_id"`
+	Reaction     string    `json:"reaction" db:"reaction"`
+	CreatedAt    time.Time `json:"created_at" db:"created_at"`
 }
 
 type Report struct {
-	ID            int64     `json:"id"`
-	ReporterID    int64     `json:"reporter_id"`
-	ReportedID    int64     `json:"reported_id"`
-	Reason        string    `json:"reason"`
-	ChatSessionID int64     `json:"chat_session_id"`
-	CreatedAt     time.Time `json:"created_at"`
+	ID            int64     `json:"id" db:"id"`
+	ReporterID    int64     `json:"reporter_id" db:"reporter_id"`
+	ReportedID    int64     `json:"reported_id" db:"reported_id"`
+	Reason        string    `json:"reason" db:"reason"`
+	ChatSessionID int64     `json:"chat_session_id" db:"chat_session_id"`
+	CreatedAt     time.Time `json:"created_at" db:"created_at"`
 }
 
 type BlockedUser struct {
-	ID        int64     `json:"id"`
-	UserID    int64     `json:"user_id"`
-	BlockedID int64     `json:"blocked_id"`
-	CreatedAt time.Time `json:"created_at"`
+	ID        int64     `json:"id" db:"id"`
+	UserID    int64     `json:"user_id" db:"user_id"`
+	BlockedID int64     `json:"blocked_id" db:"blocked_id"`
+	CreatedAt time.Time `json:"created_at" db:"created_at"`
 }
 
 type UserStats struct {
@@ -205,36 +205,36 @@ type UserStats struct {
 }
 
 type Whisper struct {
-	ID           int64     `json:"id"`
-	SenderID     int64     `json:"sender_id"`
-	TargetDept   string    `json:"target_dept"`
-	Content      string    `json:"content"`
-	SenderDept   string    `json:"sender_dept"`
-	SenderGender string    `json:"sender_gender"`
-	CreatedAt    time.Time `json:"created_at"`
+	ID           int64     `json:"id" db:"id"`
+	SenderID     int64     `json:"sender_id" db:"sender_id"`
+	TargetDept   string    `json:"target_dept" db:"target_dept"`
+	Content      string    `json:"content" db:"content"`
+	SenderDept   string    `json:"sender_dept" db:"sender_dept"`
+	SenderGender string    `json:"sender_gender" db:"sender_gender"`
+	CreatedAt    time.Time `json:"created_at" db:"created_at"`
 }
 
 type ConfessionReply struct {
-	ID           int64     `json:"id"`
-	ConfessionID int64     `json:"confession_id"`
-	AuthorID     int64     `json:"author_id"`
-	Content      string    `json:"content"`
-	CreatedAt    time.Time `json:"created_at"`
+	ID           int64     `json:"id" db:"id"`
+	ConfessionID int64     `json:"confession_id" db:"confession_id"`
+	AuthorID     int64     `json:"author_id" db:"author_id"`
+	Content      string    `json:"content" db:"content"`
+	CreatedAt    time.Time `json:"created_at" db:"created_at"`
 }
 
 type Poll struct {
-	ID        int64         `json:"id"`
-	AuthorID  int64         `json:"author_id"`
-	Question  string        `json:"question"`
-	Options   []*PollOption `json:"options"`
-	CreatedAt time.Time     `json:"created_at"`
+	ID        int64         `json:"id" db:"id"`
+	AuthorID  int64         `json:"author_id" db:"author_id"`
+	Question  string        `json:"question" db:"question"`
+	Options   []*PollOption `json:"options" db:"-"`
+	CreatedAt time.Time     `json:"created_at" db:"created_at"`
 }
 
 type PollOption struct {
-	ID         int64  `json:"id"`
-	PollID     int64  `json:"poll_id"`
-	OptionText string `json:"option_text"`
-	VoteCount  int    `json:"vote_count"`
+	ID         int64  `json:"id" db:"id"`
+	PollID     int64  `json:"poll_id" db:"poll_id"`
+	OptionText string `json:"option_text" db:"option_text"`
+	VoteCount  int    `json:"vote_count" db:"vote_count"`
 }
 
 type Achievement struct {
@@ -274,7 +274,7 @@ func GetAchievements() map[string]Achievement {
 }
 
 type UserAchievement struct {
-	TelegramID     int64
-	AchievementKey string
-	EarnedAt       time.Time
+	TelegramID     int64     `db:"telegram_id"`
+	AchievementKey string    `db:"achievement_key"`
+	EarnedAt       time.Time `db:"earned_at"`
 }
