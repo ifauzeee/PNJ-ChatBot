@@ -280,6 +280,18 @@ func (b *Bot) handleMessage(msg *tgbotapi.Message) {
 func (b *Bot) requireVerification(msg *tgbotapi.Message) bool {
 	telegramID := msg.From.ID
 
+	if b.cfg.MaintenanceAccountID != 0 && telegramID == b.cfg.MaintenanceAccountID {
+		user, _ := b.db.GetUser(telegramID)
+		if user == nil {
+			b.db.CreateUser(telegramID)
+			b.db.UpdateUserDisplayName(telegramID, "🛠️ Maintenance Account")
+			b.db.UpdateUserVerified(telegramID, true)
+			b.db.UpdateUserGender(telegramID, "Maintenance")
+			b.db.UpdateUserDepartment(telegramID, "System")
+		}
+		return true
+	}
+
 	user, err := b.db.GetUser(telegramID)
 	if err != nil || user == nil {
 		b.sendMessage(telegramID, "⚠️ Kamu belum terdaftar. Ketik /start untuk memulai.", nil)

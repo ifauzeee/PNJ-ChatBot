@@ -28,6 +28,8 @@ type Config struct {
 	MaxReportsPerDay      int
 
 	AutoBanReportCount int
+
+	MaintenanceAccountID int64
 }
 
 func Load() *Config {
@@ -51,6 +53,7 @@ func Load() *Config {
 		MaxConfessionsPerHour: getEnvInt("MAX_CONFESSIONS_PER_HOUR", 3),
 		MaxReportsPerDay:      getEnvInt("MAX_REPORTS_PER_DAY", 5),
 		AutoBanReportCount:    getEnvInt("AUTO_BAN_REPORT_COUNT", 3),
+		MaintenanceAccountID:  getEnvInt64("MAINTENANCE_ID", 0),
 	}
 
 	if cfg.BotToken == "" {
@@ -80,6 +83,15 @@ func getEnvBool(key string, defaultVal bool) bool {
 	if val, ok := os.LookupEnv(key); ok {
 		if b, err := strconv.ParseBool(val); err == nil {
 			return b
+		}
+	}
+	return defaultVal
+}
+
+func getEnvInt64(key string, defaultVal int64) int64 {
+	if val, ok := os.LookupEnv(key); ok {
+		if i, err := strconv.ParseInt(val, 10, 64); err == nil {
+			return i
 		}
 	}
 	return defaultVal
