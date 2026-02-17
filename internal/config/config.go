@@ -15,6 +15,9 @@ type Config struct {
 	CSBotToken string
 	BotDebug   bool
 
+	MaxUpdateWorkers int
+	MaxUpdateQueue   int
+
 	SMTPHost     string
 	SMTPPort     int
 	SMTPUsername string
@@ -46,6 +49,8 @@ func Load() *Config {
 		BotToken:              getEnv("BOT_TOKEN", ""),
 		CSBotToken:            getEnv("CS_BOT_TOKEN", ""),
 		BotDebug:              getEnvBool("BOT_DEBUG", false),
+		MaxUpdateWorkers:      getEnvInt("MAX_UPDATE_WORKERS", 16),
+		MaxUpdateQueue:        getEnvInt("MAX_UPDATE_QUEUE", 256),
 		SMTPHost:              getEnv("SMTP_HOST", "smtp.gmail.com"),
 		SMTPPort:              getEnvInt("SMTP_PORT", 587),
 		SMTPUsername:          getEnv("SMTP_USERNAME", ""),
@@ -63,6 +68,13 @@ func Load() *Config {
 
 	if cfg.BotToken == "" {
 		logger.Fatal("❌ BOT_TOKEN is required! Set it in .env or environment variables.")
+	}
+
+	if cfg.MaxUpdateWorkers < 1 {
+		cfg.MaxUpdateWorkers = 1
+	}
+	if cfg.MaxUpdateQueue < 1 {
+		cfg.MaxUpdateQueue = 1
 	}
 
 	return cfg

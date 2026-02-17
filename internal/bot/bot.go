@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"runtime"
+	"sync"
 	"time"
 
 	"github.com/pnj-anonymous-bot/internal/config"
@@ -29,6 +30,9 @@ type Bot struct {
 	profile    *service.ProfileService
 	room       *service.RoomService
 	startedAt  time.Time
+	updateQ    chan tgbotapi.Update
+	updateWG   sync.WaitGroup
+	userLocks  sync.Map
 }
 
 func New(cfg *config.Config, db *database.DB) (*Bot, error) {
@@ -52,6 +56,7 @@ func New(cfg *config.Config, db *database.DB) (*Bot, error) {
 		profile:    service.NewProfileService(db, cfg),
 		room:       service.NewRoomService(db),
 		startedAt:  time.Now(),
+		updateQ:    make(chan tgbotapi.Update, cfg.MaxUpdateQueue),
 	}
 
 	logger.Info("🤖 Bot authorized", zap.String("username", api.Self.UserName))
@@ -147,11 +152,32 @@ _Mohon tunggu sebentar ya..._`
 	}()
 }
 
+func (b *Bot) startUpdateWorkers() {
+	for i := 0; i < b.cfg.MaxUpdateWorkers; i++ {
+		workerID := i + 1
+		b.updateWG.Add(1)
+
+		go func() {
+			defer b.updateWG.Done()
+			for update := range b.updateQ {
+				b.handleUpdate(update)
+			}
+			logger.Debug("Update worker stopped", zap.Int("worker_id", workerID))
+		}()
+	}
+
+	logger.Info("Update worker pool started",
+		zap.Int("workers", b.cfg.MaxUpdateWorkers),
+		zap.Int("queue_size", cap(b.updateQ)),
+	)
+}
+
 func (b *Bot) Start() {
 	logger.Info("🚀 Starting PNJ Anonymous Bot...")
 
 	go b.startHealthServer()
 	b.startQueueWorker()
+	b.startUpdateWorkers()
 
 	commands := []tgbotapi.BotCommand{
 		{Command: "start", Description: "🎭 Mulai bot / Menu utama"},
@@ -185,8 +211,11 @@ func (b *Bot) Start() {
 	updates := b.api.GetUpdatesChan(u)
 
 	for update := range updates {
-		go b.handleUpdate(update)
+		b.updateQ <- update
 	}
+
+	close(b.updateQ)
+	b.updateWG.Wait()
 }
 
 func (b *Bot) handleUpdate(update tgbotapi.Update) {
@@ -195,6 +224,12 @@ func (b *Bot) handleUpdate(update tgbotapi.Update) {
 			logger.Error("❌ Panic recovered", zap.Any("recover", r))
 		}
 	}()
+
+	if userID, ok := b.extractUpdateUserID(update); ok {
+		lock := b.getUserLock(userID)
+		lock.Lock()
+		defer lock.Unlock()
+	}
 
 	if update.CallbackQuery != nil {
 		b.handleCallback(update.CallbackQuery)
@@ -211,6 +246,26 @@ func (b *Bot) handleUpdate(update tgbotapi.Update) {
 	}
 
 	b.handleMessage(update.Message)
+}
+
+func (b *Bot) extractUpdateUserID(update tgbotapi.Update) (int64, bool) {
+	if update.CallbackQuery != nil && update.CallbackQuery.From != nil {
+		return update.CallbackQuery.From.ID, true
+	}
+	if update.Message != nil && update.Message.From != nil {
+		return update.Message.From.ID, true
+	}
+	return 0, false
+}
+
+func (b *Bot) getUserLock(userID int64) *sync.Mutex {
+	if lock, ok := b.userLocks.Load(userID); ok {
+		return lock.(*sync.Mutex)
+	}
+
+	newLock := &sync.Mutex{}
+	actual, _ := b.userLocks.LoadOrStore(userID, newLock)
+	return actual.(*sync.Mutex)
 }
 
 func (b *Bot) handleCommand(msg *tgbotapi.Message) {
