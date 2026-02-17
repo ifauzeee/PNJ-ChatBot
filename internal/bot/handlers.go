@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/pnj-anonymous-bot/internal/models"
 
@@ -366,19 +367,35 @@ func (b *Bot) handleChatMessage(msg *tgbotapi.Message) {
 		photos := msg.Photo
 		photo := photos[len(photos)-1]
 		photoMsg := tgbotapi.NewPhoto(partnerID, tgbotapi.FileID(photo.FileID))
+		photoMsg.Caption = "🖼️ *Foto Sekali Lihat* (Akan terhapus dalam 10 detik)"
 		if msg.Caption != "" {
-			photoMsg.Caption = fmt.Sprintf("💬 Stranger: %s", msg.Caption)
+			photoMsg.Caption += "\n\n💬 Stranger: " + msg.Caption
 		}
-		b.api.Send(photoMsg)
+		photoMsg.ParseMode = "Markdown"
+		sentMsg, _ := b.api.Send(photoMsg)
+
+		go func(chatID int64, messageID int) {
+			time.Sleep(10 * time.Second)
+			deleteMsg := tgbotapi.NewDeleteMessage(chatID, messageID)
+			b.api.Send(deleteMsg)
+		}(partnerID, sentMsg.MessageID)
 	} else if msg.Voice != nil {
 		voice := tgbotapi.NewVoice(partnerID, tgbotapi.FileID(msg.Voice.FileID))
 		b.api.Send(voice)
 	} else if msg.Video != nil {
 		video := tgbotapi.NewVideo(partnerID, tgbotapi.FileID(msg.Video.FileID))
+		video.Caption = "📹 *Video Sekali Lihat* (Akan terhapus dalam 15 detik)"
 		if msg.Caption != "" {
-			video.Caption = fmt.Sprintf("💬 Stranger: %s", msg.Caption)
+			video.Caption += "\n\n💬 Stranger: " + msg.Caption
 		}
-		b.api.Send(video)
+		video.ParseMode = "Markdown"
+		sentMsg, _ := b.api.Send(video)
+
+		go func(chatID int64, messageID int) {
+			time.Sleep(15 * time.Second)
+			deleteMsg := tgbotapi.NewDeleteMessage(chatID, messageID)
+			b.api.Send(deleteMsg)
+		}(partnerID, sentMsg.MessageID)
 	} else if msg.Document != nil {
 		doc := tgbotapi.NewDocument(partnerID, tgbotapi.FileID(msg.Document.FileID))
 		if msg.Caption != "" {
