@@ -117,7 +117,7 @@ func (b *Bot) handleSearchCallback(telegramID int64, value string, callback *tgb
 	b.startSearch(telegramID, preferredDept)
 }
 
-func (b *Bot) handleChatActionCallback(telegramID int64, action string, callback *tgbotapi.CallbackQuery) {
+func (b *Bot) handleChatActionCallback(telegramID int64, action string, _ *tgbotapi.CallbackQuery) {
 	switch action {
 	case "next":
 		partnerID, err := b.chat.NextPartner(telegramID)

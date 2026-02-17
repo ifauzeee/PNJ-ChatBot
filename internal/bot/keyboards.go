@@ -2,7 +2,6 @@ package bot
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/pnj-anonymous-bot/internal/models"
 
@@ -173,14 +172,4 @@ func BackToMenuKeyboard() tgbotapi.InlineKeyboardMarkup {
 			tgbotapi.NewInlineKeyboardButtonData("🔙 Menu Utama", "menu:main"),
 		),
 	)
-}
-
-func formatDepartmentList() string {
-	depts := models.AllDepartments()
-	var sb strings.Builder
-	for i, dept := range depts {
-		emoji := models.DepartmentEmoji(dept)
-		sb.WriteString(fmt.Sprintf("  %d. %s %s\n", i+1, emoji, string(dept)))
-	}
-	return sb.String()
 }
