@@ -75,6 +75,13 @@ func (s *ProfileService) UpdateGender(telegramID int64, gender string) error {
 	return s.db.UpdateUserGender(telegramID, gender)
 }
 
+func (s *ProfileService) UpdateYear(telegramID int64, year int) error {
+	if year < 2018 || year > 2026 {
+		return fmt.Errorf("tahun angkatan tidak valid")
+	}
+	return s.db.UpdateUserYear(telegramID, year)
+}
+
 func (s *ProfileService) UpdateDepartment(telegramID int64, dept string) error {
 	if !models.IsValidDepartment(dept) {
 		return fmt.Errorf("jurusan tidak valid")

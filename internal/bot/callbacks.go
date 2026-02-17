@@ -53,6 +53,20 @@ func (b *Bot) handleCallback(callback *tgbotapi.CallbackQuery) {
 }
 
 func (b *Bot) handleGenderCallback(telegramID int64, gender string, callback *tgbotapi.CallbackQuery) {
+	deleteMsg := tgbotapi.NewDeleteMessage(telegramID, callback.Message.MessageID)
+	b.api.Send(deleteMsg)
+
+	_, stateData, _ := b.db.GetUserState(telegramID)
+	if stateData == "edit" {
+		if err := b.profile.UpdateGender(telegramID, gender); err != nil {
+			b.sendMessage(telegramID, fmt.Sprintf("⚠️ %s", err.Error()), nil)
+			return
+		}
+		b.db.SetUserState(telegramID, models.StateNone, "")
+		b.sendMessage(telegramID, "✅ Profil berhasil diperbarui!", nil)
+		return
+	}
+
 	err := b.profile.SetGender(telegramID, gender)
 	if err != nil {
 		b.sendMessage(telegramID, fmt.Sprintf("⚠️ %s", err.Error()), nil)
@@ -60,17 +74,26 @@ func (b *Bot) handleGenderCallback(telegramID int64, gender string, callback *tg
 	}
 
 	emoji := models.GenderEmoji(models.Gender(gender))
+	b.sendMessage(telegramID, fmt.Sprintf("✅ Gender dipilih: %s *%s*", emoji, gender), nil)
 
+	kb := YearKeyboard()
+	b.sendMessage(telegramID, "🎓 *Pilih Tahun Angkatan (Masuk) Kamu:*", &kb)
+}
+func (b *Bot) handleDeptCallback(telegramID int64, dept string, callback *tgbotapi.CallbackQuery) {
 	deleteMsg := tgbotapi.NewDeleteMessage(telegramID, callback.Message.MessageID)
 	b.api.Send(deleteMsg)
 
-	b.sendMessage(telegramID, fmt.Sprintf("✅ Gender dipilih: %s *%s*", emoji, gender), nil)
+	_, stateData, _ := b.db.GetUserState(telegramID)
+	if stateData == "edit" {
+		if err := b.profile.UpdateDepartment(telegramID, dept); err != nil {
+			b.sendMessage(telegramID, fmt.Sprintf("⚠️ %s", err.Error()), nil)
+			return
+		}
+		b.db.SetUserState(telegramID, models.StateNone, "")
+		b.sendMessage(telegramID, "✅ Profil berhasil diperbarui!", nil)
+		return
+	}
 
-	kb := DepartmentKeyboard()
-	b.sendMessage(telegramID, "🏛️ *Pilih Jurusan Kamu:*\n\nPilih jurusan di bawah ini:", &kb)
-}
-
-func (b *Bot) handleDeptCallback(telegramID int64, dept string, callback *tgbotapi.CallbackQuery) {
 	err := b.profile.SetDepartment(telegramID, dept)
 	if err != nil {
 		b.sendMessage(telegramID, fmt.Sprintf("⚠️ %s", err.Error()), nil)
@@ -78,40 +101,20 @@ func (b *Bot) handleDeptCallback(telegramID int64, dept string, callback *tgbota
 	}
 
 	emoji := models.DepartmentEmoji(models.Department(dept))
-
-	deleteMsg := tgbotapi.NewDeleteMessage(telegramID, callback.Message.MessageID)
-	b.api.Send(deleteMsg)
-
 	b.sendMessage(telegramID, fmt.Sprintf("✅ Jurusan dipilih: %s *%s*", emoji, dept), nil)
 
 	user, err := b.db.GetUser(telegramID)
 	if err == nil && user != nil && user.Year == 0 {
+		b.db.SetUserState(telegramID, models.StateAwaitingYear, "")
 		kb := YearKeyboard()
 		b.sendMessage(telegramID, "🎓 *Pilih Tahun Angkatan (Masuk) Kamu:*", &kb)
 		return
 	}
 
 	if user != nil {
-		completeText := fmt.Sprintf(`🎉 *Profil Kamu Sudah Lengkap!*
-
-━━━━━━━━━━━━━━━━━━━
-🏷️ Nama Anonim: *%s*
-%s Gender: *%s*
-%s Jurusan: *%s*
-━━━━━━━━━━━━━━━━━━━
-
-🚀 Kamu siap menggunakan PNJ Anonymous Bot!
-Pilih menu di bawah untuk memulai:`,
-			user.DisplayName,
-			models.GenderEmoji(user.Gender), string(user.Gender),
-			models.DepartmentEmoji(user.Department), string(user.Department),
-		)
-
-		kb := MainMenuKeyboard()
-		b.sendMessage(telegramID, completeText, &kb)
+		b.showMainMenu(telegramID, user)
 	}
 }
-
 func (b *Bot) handleSearchCallback(telegramID int64, value string, callback *tgbotapi.CallbackQuery) {
 	if value == "cancel" {
 		deleteMsg := tgbotapi.NewDeleteMessage(telegramID, callback.Message.MessageID)
@@ -309,36 +312,54 @@ func (b *Bot) handleEditCallback(telegramID int64, field string, callback *tgbot
 		kb := YearKeyboard()
 		b.sendMessage(telegramID, "🎓 *Pilih Tahun Angkatan Baru:*", &kb)
 		b.db.SetUserState(telegramID, models.StateAwaitingYear, "edit")
+
+	case "department":
+		kb := DepartmentKeyboard()
+		b.sendMessage(telegramID, "🏛️ *Pilih Jurusan Baru:*", &kb)
+		b.db.SetUserState(telegramID, models.StateAwaitingDept, "edit")
 	}
 }
-
 func (b *Bot) handleYearCallback(telegramID int64, value string, callback *tgbotapi.CallbackQuery) {
-	year, _ := strconv.Atoi(value)
-	err := b.profile.SetYear(telegramID, year)
+	year, err := strconv.Atoi(value)
 	if err != nil {
-		b.sendMessage(telegramID, fmt.Sprintf("⚠️ %s", err.Error()), nil)
+		b.sendMessage(telegramID, "⚠️ Tahun angkatan tidak valid.", nil)
 		return
 	}
 
 	deleteMsg := tgbotapi.NewDeleteMessage(telegramID, callback.Message.MessageID)
 	b.api.Send(deleteMsg)
 
-	b.sendMessage(telegramID, fmt.Sprintf("✅ Angkatan dipilih: *%d*", year), nil)
-
 	_, stateData, _ := b.db.GetUserState(telegramID)
 	if stateData == "edit" {
+		err := b.profile.UpdateYear(telegramID, year)
+		if err != nil {
+			b.sendMessage(telegramID, fmt.Sprintf("⚠️ %s", err.Error()), nil)
+			return
+		}
 		b.db.SetUserState(telegramID, models.StateNone, "")
 		b.sendMessage(telegramID, "✅ Profil berhasil diperbarui!", nil)
 		return
 	}
 
+	err = b.profile.SetYear(telegramID, year)
+	if err != nil {
+		b.sendMessage(telegramID, fmt.Sprintf("⚠️ %s", err.Error()), nil)
+		return
+	}
+
+	b.sendMessage(telegramID, fmt.Sprintf("✅ Angkatan dipilih: *%d*", year), nil)
+
 	user, _ := b.db.GetUser(telegramID)
 	if user != nil && string(user.Department) == "" {
 		kb := DepartmentKeyboard()
 		b.sendMessage(telegramID, "🏛️ *Pilih Jurusan Kamu:*\n\nPilih jurusan di bawah ini:", &kb)
+		return
+	}
+
+	if user != nil {
+		b.showMainMenu(telegramID, user)
 	}
 }
-
 func (b *Bot) handleVoteCallback(telegramID int64, value string, callback *tgbotapi.CallbackQuery) {
 	parts := strings.Split(value, ":")
 	if len(parts) < 2 {
