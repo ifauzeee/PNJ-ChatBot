@@ -2,6 +2,7 @@ package bot
 
 import (
 	"fmt"
+	"html"
 	"strconv"
 	"strings"
 	"time"
@@ -265,7 +266,7 @@ func (b *Bot) notifyMatchFound(user1ID, user2ID int64) {
 
 	kb := ChatActionKeyboard()
 
-	msg1 := fmt.Sprintf(`🎉 *Partner Ditemukan!*
+	msg1 := fmt.Sprintf(`<b>🎉 Partner Ditemukan!</b>
 
 ━━━━━━━━━━━━━━━━━━━
 Partner kamu:
@@ -274,13 +275,13 @@ Partner kamu:
 ━━━━━━━━━━━━━━━━━━━
 
 💬 Mulai ngobrol sekarang!
-Semua pesan akan diteruskan secara *anonim*.
+Semua pesan akan diteruskan secara <b>anonim</b>.
 
-_Ketik pesan untuk memulai..._`,
-		models.GenderEmoji(models.Gender(gender2)), gender2, year2,
-		models.DepartmentEmoji(models.Department(dept2)), dept2)
+<i>Ketik pesan untuk memulai...</i>`,
+		models.GenderEmoji(models.Gender(gender2)), html.EscapeString(gender2), year2,
+		models.DepartmentEmoji(models.Department(dept2)), html.EscapeString(dept2))
 
-	msg2 := fmt.Sprintf(`🎉 *Partner Ditemukan!*
+	msg2 := fmt.Sprintf(`<b>🎉 Partner Ditemukan!</b>
 
 ━━━━━━━━━━━━━━━━━━━
 Partner kamu:
@@ -289,14 +290,14 @@ Partner kamu:
 ━━━━━━━━━━━━━━━━━━━
 
 💬 Mulai ngobrol sekarang!
-Semua pesan akan diteruskan secara *anonim*.
+Semua pesan akan diteruskan secara <b>anonim</b>.
 
-_Ketik pesan untuk memulai..._`,
-		models.GenderEmoji(models.Gender(gender1)), gender1, year1,
-		models.DepartmentEmoji(models.Department(dept1)), dept1)
+<i>Ketik pesan untuk memulai...</i>`,
+		models.GenderEmoji(models.Gender(gender1)), html.EscapeString(gender1), year1,
+		models.DepartmentEmoji(models.Department(dept1)), html.EscapeString(dept1))
 
-	b.sendMessage(user1ID, msg1, &kb)
-	b.sendMessage(user2ID, msg2, &kb)
+	b.sendMessageHTML(user1ID, msg1, &kb)
+	b.sendMessageHTML(user2ID, msg2, &kb)
 }
 
 func (b *Bot) handleNext(msg *tgbotapi.Message) {
@@ -481,7 +482,7 @@ func (b *Bot) handleConfessions(msg *tgbotapi.Message) {
 		return
 	}
 
-	header := "📋 *Confession Terbaru*\n━━━━━━━━━━━━━━━━━━━\n\n"
+	header := "<b>📋 Confession Terbaru</b>\n━━━━━━━━━━━━━━━━━━━\n\n"
 
 	for _, c := range confessions {
 		emoji := models.DepartmentEmoji(models.Department(c.Department))
@@ -498,18 +499,18 @@ func (b *Bot) handleConfessions(msg *tgbotapi.Message) {
 			replyStr = fmt.Sprintf("💬 %d Replies", replyCount)
 		}
 
-		text := fmt.Sprintf(`💬 *#%d* | %s %s
+		text := fmt.Sprintf(`💬 <b>#%d</b> | %s %s
 %s
 %s %s
 ─────────────────
-`, c.ID, emoji, c.Department, escapeMarkdown(c.Content), reactionStr, replyStr)
+`, c.ID, emoji, html.EscapeString(c.Department), html.EscapeString(c.Content), reactionStr, replyStr)
 
 		header += text
 	}
 
-	header += "\n_React: ketik_ /react <id> <emoji>\n_Balas: ketik_ /reply <id> <pesan>\n_Lihat: ketik_ /view_replies <id>"
+	header += "\n<i>React: ketik</i> /react &lt;id&gt; &lt;emoji&gt;\n<i>Balas: ketik</i> /reply &lt;id&gt; &lt;pesan&gt;\n<i>Lihat: ketik</i> /view_replies &lt;id&gt;"
 
-	b.sendMessage(telegramID, header, nil)
+	b.sendMessageHTML(telegramID, header, nil)
 }
 
 func (b *Bot) handleReact(msg *tgbotapi.Message) {
@@ -611,15 +612,15 @@ func (b *Bot) handleViewReplies(msg *tgbotapi.Message) {
 		return
 	}
 
-	response := fmt.Sprintf("📋 *Balasan Confession #%d*\n", confessionID)
-	response += fmt.Sprintf("> %s\n", escapeMarkdown(confession.Content))
+	response := fmt.Sprintf("<b>📋 Balasan Confession #%d</b>\n", confessionID)
+	response += fmt.Sprintf("&gt; <i>%s</i>\n", html.EscapeString(confession.Content))
 	response += "━━━━━━━━━━━━━━━━━━━\n\n"
 
 	for i, r := range replies {
-		response += fmt.Sprintf("*%d.* %s\n\n", i+1, escapeMarkdown(r.Content))
+		response += fmt.Sprintf("<b>%d.</b> %s\n\n", i+1, html.EscapeString(r.Content))
 	}
 
-	b.sendMessage(telegramID, response, nil)
+	b.sendMessageHTML(telegramID, response, nil)
 }
 
 func (b *Bot) handleWhisper(msg *tgbotapi.Message) {
@@ -681,10 +682,10 @@ _Pesan anonim untuk jurusan %s_`,
 		b.sendMessage(targetID, whisperMsg, nil)
 	}
 
-	b.sendMessage(telegramID, fmt.Sprintf("✅ *Whisper Terkirim!*\n\n📤 Dikirim ke *%d* mahasiswa %s %s",
+	b.sendMessageHTML(telegramID, fmt.Sprintf("✅ <b>Whisper Terkirim!</b>\n\n📤 Dikirim ke <b>%d</b> mahasiswa %s %s",
 		len(targets),
 		models.DepartmentEmoji(models.Department(targetDept)),
-		targetDept,
+		html.EscapeString(targetDept),
 	), nil)
 }
 
@@ -699,29 +700,29 @@ func (b *Bot) handleProfile(msg *tgbotapi.Message) {
 
 	totalChats, totalConfessions, totalReactions, daysSince, _ := b.profile.GetStats(telegramID)
 
-	profileText := fmt.Sprintf(`👤 *Profil Kamu*
+	profileText := fmt.Sprintf(`<b>👤 Profil Kamu</b>
 
 ━━━━━━━━━━━━━━━━━━━
-🏷️ *Nama Anonim:* %s
-✨ *Karma:* *%d*
-%s *Gender:* %s
-🎓 *Angkatan:* %d
-%s *Jurusan:* %s
-📧 *Email:* ||%s||
+🏷️ <b>Nama Anonim:</b> %s
+✨ <b>Karma:</b> <b>%d</b>
+%s <b>Gender:</b> %s
+🎓 <b>Angkatan:</b> %d
+%s <b>Jurusan:</b> %s
+📧 <b>Email:</b> %s
 ━━━━━━━━━━━━━━━━━━━
-📊 *Statistik:*
-💬 Total Chat: *%d*
-📝 Confessions: *%d*
-❤️ Reactions Diterima: *%d*
-📅 Hari Aktif: *%d*
+📊 <b>Statistik:</b>
+💬 Total Chat: <b>%d</b>
+📝 Confessions: <b>%d</b>
+❤️ Reactions Diterima: <b>%d</b>
+📅 Hari Aktif: <b>%d</b>
 ━━━━━━━━━━━━━━━━━━━
 ⚠️ Report Count: %d/3`,
-		user.DisplayName,
+		html.EscapeString(user.DisplayName),
 		user.Karma,
-		models.GenderEmoji(user.Gender), string(user.Gender),
+		models.GenderEmoji(user.Gender), html.EscapeString(string(user.Gender)),
 		user.Year,
-		models.DepartmentEmoji(user.Department), string(user.Department),
-		maskEmail(user.Email),
+		models.DepartmentEmoji(user.Department), html.EscapeString(string(user.Department)),
+		html.EscapeString(maskEmail(user.Email)),
 		totalChats,
 		totalConfessions,
 		totalReactions,
@@ -730,7 +731,7 @@ func (b *Bot) handleProfile(msg *tgbotapi.Message) {
 	)
 
 	kb := BackToMenuKeyboard()
-	b.sendMessage(telegramID, profileText, &kb)
+	b.sendMessageHTML(telegramID, profileText, &kb)
 }
 
 func (b *Bot) handleStats(msg *tgbotapi.Message) {
@@ -748,21 +749,21 @@ func (b *Bot) handleStats(msg *tgbotapi.Message) {
 		return
 	}
 
-	statsText := fmt.Sprintf(`📊 *Statistik Kamu*
+	statsText := fmt.Sprintf(`<b>📊 Statistik Kamu</b>
 
 ━━━━━━━━━━━━━━━━━━━
-✨ Total Karma: *%d*
-💬 Total Chat: *%d*
-📝 Confession Dibuat: *%d*
-❤️ Reactions Diterima: *%d*
-📅 Hari Sejak Bergabung: *%d*
+✨ Total Karma: <b>%d</b>
+💬 Total Chat: <b>%d</b>
+📝 Confession Dibuat: <b>%d</b>
+❤️ Reactions Diterima: <b>%d</b>
+📅 Hari Sejak Bergabung: <b>%d</b>
 ━━━━━━━━━━━━━━━━━━━
 
-_Terus berinteraksi untuk meningkatkan statistik kamu!_ 🚀`,
+<i>Terus berinteraksi untuk meningkatkan statistik kamu!</i> 🚀`,
 		user.Karma, totalChats, totalConfessions, totalReactions, daysSince)
 
 	kb := BackToMenuKeyboard()
-	b.sendMessage(telegramID, statsText, &kb)
+	b.sendMessageHTML(telegramID, statsText, &kb)
 }
 
 func (b *Bot) handleEdit(msg *tgbotapi.Message) {
@@ -809,26 +810,26 @@ func (b *Bot) handleReportInput(msg *tgbotapi.Message) {
 
 	newCount, err := b.profile.ReportUser(telegramID, reportedID, msg.Text, sessionID)
 	if err != nil {
-		b.sendMessage(telegramID, fmt.Sprintf("⚠️ %s", err.Error()), nil)
+		b.sendMessageHTML(telegramID, fmt.Sprintf("⚠️ <b>%s</b>", html.EscapeString(err.Error())), nil)
 		return
 	}
 
 	if newCount > 0 && newCount < b.cfg.AutoBanReportCount {
-		warningMsg := fmt.Sprintf(`⚠️ *PERINGATAN MODERASI*
+		warningMsg := fmt.Sprintf(`⚠️ <b>PERINGATAN MODERASI</b>
 
 Akun kamu baru saja dilaporkan karena perilaku atau pesan yang tidak pantas.
 
-📊 Status Laporan: *%d/%d*
+📊 Status Laporan: <b>%d/%d</b>
 
 Mohon patuhi aturan komunitas agar akun kamu tidak diblokir secara otomatis oleh sistem.`, newCount, b.cfg.AutoBanReportCount)
 
-		b.sendMessage(reportedID, warningMsg, nil)
+		b.sendMessageHTML(reportedID, warningMsg, nil)
 	} else if newCount >= b.cfg.AutoBanReportCount {
-		b.sendMessage(reportedID, "🚫 *Akun kamu telah diblokir otomatis oleh sistem karena telah mencapai batas laporan (3/3).* Kamu tidak bisa lagi menggunakan bot ini.", nil)
+		b.sendMessageHTML(reportedID, "🚫 <b>Akun kamu telah diblokir otomatis oleh sistem karena telah mencapai batas laporan (3/3).</b> Kamu tidak bisa lagi menggunakan bot ini.", nil)
 	}
 
 	b.db.SetUserState(telegramID, models.StateNone, "")
-	b.sendMessage(telegramID, "✅ *Laporan Terkirim!*\n\nTerima kasih atas laporanmu. Tim kami akan meninjau laporan ini.", nil)
+	b.sendMessageHTML(telegramID, "✅ <b>Laporan Terkirim!</b>\n\nTerima kasih atas laporanmu. Tim kami akan meninjau laporan ini.", nil)
 }
 
 func (b *Bot) handleBlock(msg *tgbotapi.Message) {
@@ -911,24 +912,10 @@ func maskEmail(emailAddr string) string {
 
 func escapeMarkdown(text string) string {
 	replacer := strings.NewReplacer(
-		"_", "\\_",
 		"*", "\\*",
+		"_", "\\_",
 		"[", "\\[",
-		"]", "\\]",
-		"(", "\\(",
-		")", "\\)",
-		"~", "\\~",
 		"`", "\\`",
-		">", "\\>",
-		"#", "\\#",
-		"+", "\\+",
-		"-", "\\-",
-		"=", "\\=",
-		"|", "\\|",
-		"{", "\\{",
-		"}", "\\}",
-		".", "\\.",
-		"!", "\\!",
 	)
 	return replacer.Replace(text)
 }
