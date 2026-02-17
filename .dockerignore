@@ -1,0 +1,42 @@
+# Git
+.git
+.gitignore
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Documentation (not needed in image)
+IMPLEMENTATION_PLAN.md
+README.md
+LICENSE
+
+# Environment (injected at runtime)
+.env
+.env.*
+!.env.example
+
+# Build artifacts
+bin/
+*.exe
+
+# Database (mounted as volume)
+data/
+*.db
+*.db-wal
+*.db-shm
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Docker
+Dockerfile
+docker-compose*.yml
+.dockerignore
+
+# Agent/AI
+.agent/
+.gemini/

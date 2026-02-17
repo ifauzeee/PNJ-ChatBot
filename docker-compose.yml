@@ -1,0 +1,74 @@
+# ============================================================
+# 🎭 PNJ Anonymous Bot — Docker Compose
+# ============================================================
+# Usage:
+#   Development : docker compose up --build
+#   Production  : docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+#   Stop        : docker compose down
+#   Logs        : docker compose logs -f pnj-bot
+#   Rebuild     : docker compose up --build --force-recreate
+# ============================================================
+
+services:
+  pnj-bot:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: pnj-anonymous-bot
+    restart: unless-stopped
+
+    # Environment variables from .env file
+    env_file:
+      - .env
+
+    # Override DB path for container
+    environment:
+      - DB_PATH=/app/data/pnj_anonymous.db
+      - TZ=Asia/Jakarta
+
+    # Persistent volume for SQLite database
+    volumes:
+      - pnj-bot-data:/app/data
+
+    # Expose health check port
+    ports:
+      - "8080:8080"
+
+    # Health check
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 256M
+        reservations:
+          cpus: "0.25"
+          memory: 64M
+
+    # Logging configuration
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "5"
+        tag: "pnj-bot"
+
+    # Security options
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp:size=10M
+
+# Named volumes for data persistence
+volumes:
+  pnj-bot-data:
+    driver: local
+    name: pnj-anonymous-bot-data

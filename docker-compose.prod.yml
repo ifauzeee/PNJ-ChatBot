@@ -1,0 +1,44 @@
+# ============================================================
+# 🎭 PNJ Anonymous Bot — Production Override
+# ============================================================
+# Usage: docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+# ============================================================
+
+services:
+  pnj-bot:
+    restart: always
+
+    environment:
+      - BOT_DEBUG=false
+
+    # Stricter resource limits for production
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 512M
+        reservations:
+          cpus: "0.5"
+          memory: 128M
+
+    # Production logging — send to stderr/stdout for log aggregators
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "10"
+        tag: "pnj-bot-prod"
+
+  # ── Optional: Watchtower for auto-update ──
+  watchtower:
+    image: containrrr/watchtower:latest
+    container_name: pnj-bot-watchtower
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      - WATCHTOWER_CLEANUP=true
+      - WATCHTOWER_POLL_INTERVAL=300
+      - WATCHTOWER_LABEL_ENABLE=true
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
