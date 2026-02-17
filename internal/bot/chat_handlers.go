@@ -200,7 +200,12 @@ func (b *Bot) handleChatMessage(msg *tgbotapi.Message) {
 	}
 
 	if msg.Text != "" {
-		b.sendMessage(partnerID, fmt.Sprintf("💬 *Stranger:*\n%s", escapeMarkdown(msg.Text)), nil)
+		text := msg.Text
+		if b.profanity.IsBad(text) {
+			text = b.profanity.Clean(text)
+			b.sendMessage(telegramID, "⚠️ *Peringatan:* Pesan kamu mengandung kata-kata yang tidak pantas dan telah disensor.", nil)
+		}
+		b.sendMessage(partnerID, fmt.Sprintf("💬 *Stranger:*\n%s", escapeMarkdown(text)), nil)
 	} else if msg.Sticker != nil || msg.Photo != nil || msg.Animation != nil {
 		if safe, reason := b.isSafeMedia(msg); !safe {
 			b.sendMessage(telegramID, "🚫 *Konten diblokir:* "+reason, nil)

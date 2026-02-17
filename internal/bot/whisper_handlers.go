@@ -34,7 +34,13 @@ func (b *Bot) handleWhisperInput(msg *tgbotapi.Message, targetDept string) {
 		return
 	}
 
-	targets, err := b.profile.SendWhisper(telegramID, targetDept, msg.Text)
+	content := msg.Text
+	if b.profanity.IsBad(content) {
+		content = b.profanity.Clean(content)
+		b.sendMessage(telegramID, "⚠️ *Peringatan:* Whisper kamu mengandung kata-kata yang tidak pantas dan telah disensor.", nil)
+	}
+
+	targets, err := b.profile.SendWhisper(telegramID, targetDept, content)
 	if err != nil {
 		b.sendMessage(telegramID, fmt.Sprintf("⚠️ %s", err.Error()), nil)
 		return
@@ -62,7 +68,7 @@ _Pesan anonim untuk jurusan %s_`,
 			models.DepartmentEmoji(models.Department(senderDept)), senderDept,
 			models.GenderEmoji(models.Gender(senderGender)), senderGender,
 			models.DepartmentEmoji(models.Department(senderDept)),
-			escapeMarkdown(msg.Text),
+			escapeMarkdown(content),
 			targetDept,
 		)
 		b.sendMessage(targetID, whisperMsg, nil)

@@ -40,12 +40,13 @@ func (b *Bot) handleConfessionInput(msg *tgbotapi.Message) {
 		return
 	}
 
-	if len(msg.Text) > 1000 {
-		b.sendMessage(telegramID, "⚠️ Confession terlalu panjang. Maksimal 1000 karakter.", nil)
-		return
+	content := msg.Text
+	if b.profanity.IsBad(content) {
+		content = b.profanity.Clean(content)
+		b.sendMessage(telegramID, "⚠️ *Peringatan:* Confession kamu mengandung kata-kata yang tidak pantas dan telah disensor.", nil)
 	}
 
-	confession, err := b.confession.CreateConfession(telegramID, msg.Text)
+	confession, err := b.confession.CreateConfession(telegramID, content)
 	if err != nil {
 		b.sendMessage(telegramID, fmt.Sprintf("⚠️ %s", err.Error()), nil)
 		return
@@ -157,6 +158,11 @@ func (b *Bot) handleReply(msg *tgbotapi.Message) {
 	}
 
 	content := parts[1]
+	if b.profanity.IsBad(content) {
+		content = b.profanity.Clean(content)
+		b.sendMessage(telegramID, "⚠️ *Peringatan:* Balasan kamu mengandung kata-kata yang tidak pantas dan telah disensor.", nil)
+	}
+
 	err = b.db.CreateConfessionReply(confessionID, telegramID, content)
 	if err != nil {
 		b.sendMessage(telegramID, "❌ Gagal mengirim balasan.", nil)

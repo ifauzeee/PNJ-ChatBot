@@ -65,15 +65,19 @@ func (b *Bot) handleCircleMessage(msg *tgbotapi.Message) {
 		senderInfo = fmt.Sprintf("%s %s", models.GenderEmoji(user.Gender), string(user.Department))
 	}
 
-	broadcastText := fmt.Sprintf("👥 <b>[%s]</b>\n👤 %s: %s", roomName, senderInfo, html.EscapeString(msg.Text))
-
 	for _, memberID := range members {
 		if memberID == telegramID {
 			continue
 		}
 
 		if msg.Text != "" {
-			b.sendMessageHTML(memberID, broadcastText, nil)
+			text := msg.Text
+			if b.profanity.IsBad(text) {
+				text = b.profanity.Clean(text)
+				b.sendMessage(telegramID, "⚠️ *Peringatan:* Pesan kamu mengandung kata-kata yang tidak pantas dan telah disensor.", nil)
+			}
+			msgOut := fmt.Sprintf("👥 <b>[%s]</b>\n👤 %s: %s", roomName, senderInfo, html.EscapeString(text))
+			b.sendMessageHTML(memberID, msgOut, nil)
 		} else {
 			if safe, reason := b.isSafeMedia(msg); !safe {
 				b.sendMessage(telegramID, "🚫 *Konten diblokir:* "+reason, nil)

@@ -58,6 +58,7 @@ type Bot struct {
 	profile    *service.ProfileService
 	room       *service.RoomService
 	moderation *service.ModerationService
+	profanity  *service.ProfanityService
 	startedAt  time.Time
 	updateQ    chan tgbotapi.Update
 	updateWG   sync.WaitGroup
@@ -86,6 +87,7 @@ func New(cfg *config.Config, db *database.DB) (*Bot, error) {
 		profile:    service.NewProfileService(db, cfg),
 		room:       service.NewRoomService(db),
 		moderation: service.NewModerationService(cfg),
+		profanity:  service.NewProfanityService(),
 		startedAt:  time.Now(),
 		updateQ:    make(chan tgbotapi.Update, cfg.MaxUpdateQueue),
 	}
