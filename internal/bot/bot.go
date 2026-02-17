@@ -47,7 +47,7 @@ func New(cfg *config.Config, db *database.DB) (*Bot, error) {
 		cfg:        cfg,
 		db:         db,
 		auth:       service.NewAuthService(db, emailSender, cfg),
-		chat:       service.NewChatService(db, redisSvc),
+		chat:       service.NewChatService(db, redisSvc, cfg.MaxSearchPerMinute),
 		confession: service.NewConfessionService(db, cfg),
 		profile:    service.NewProfileService(db, cfg),
 		room:       service.NewRoomService(db),
