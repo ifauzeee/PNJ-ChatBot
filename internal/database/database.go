@@ -18,7 +18,7 @@ type DB struct {
 }
 
 func New() (*DB, error) {
-	dbType := os.Getenv("DB_TYPE")
+	dbType := strings.ToLower(strings.TrimSpace(os.Getenv("DB_TYPE")))
 	if dbType == "" {
 		dbType = "sqlite"
 	}
@@ -62,11 +62,8 @@ func New() (*DB, error) {
 	return d, nil
 }
 
-// PrepareQuery automaticly converts '?' placeholders to '$n' for PostgreSQL
-// and handles syntax differences like INSERT OR IGNORE/REPLACE
 func (d *DB) PrepareQuery(query string) string {
-	if d.DBType == "postgres" {
-		// Replace INSERT OR IGNORE with INSERT INTO ... ON CONFLICT DO NOTHING
+	if strings.ToLower(d.DBType) == "postgres" {
 		if strings.Contains(query, "INSERT OR IGNORE INTO") {
 			query = strings.Replace(query, "INSERT OR IGNORE INTO", "INSERT INTO", 1)
 			if !strings.Contains(query, "ON CONFLICT") {
@@ -81,7 +78,6 @@ func (d *DB) PrepareQuery(query string) string {
 				}
 			}
 		}
-		// Replace INSERT OR REPLACE with INSERT INTO ... ON CONFLICT DO UPDATE
 		if strings.Contains(query, "INSERT OR REPLACE INTO") {
 			query = strings.Replace(query, "INSERT OR REPLACE INTO", "INSERT INTO", 1)
 			if !strings.Contains(query, "ON CONFLICT") {
@@ -342,10 +338,11 @@ func (d *DB) migrate() error {
 	}
 
 	for _, m := range migrations {
-		if strings.Contains(m, "CREATE INDEX IF NOT EXISTS") && isPostgres {
-		}
 		if _, err := d.Exec(m); err != nil {
-			if strings.Contains(err.Error(), "already exists") {
+			errStr := strings.ToLower(err.Error())
+			if strings.Contains(errStr, "already exists") ||
+				strings.Contains(errStr, "duplicate key value") ||
+				strings.Contains(errStr, "duplicate") {
 				continue
 			}
 			return fmt.Errorf("migration failed: %s\nerror: %w", m, err)
