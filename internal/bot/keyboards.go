@@ -164,15 +164,18 @@ func MainMenuKeyboard() tgbotapi.InlineKeyboardMarkup {
 		),
 		tgbotapi.NewInlineKeyboardRow(
 			tgbotapi.NewInlineKeyboardButtonData("👤 Profil", "menu:profile"),
-			tgbotapi.NewInlineKeyboardButtonData("📊 Statistik", "menu:stats"),
+			tgbotapi.NewInlineKeyboardButtonData("🏆 Leaderboard", "menu:leaderboard"),
 		),
 		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData("🗳️ Polling", "menu:polls"),
+			tgbotapi.NewInlineKeyboardButtonData("📊 Statistik", "menu:stats"),
 			tgbotapi.NewInlineKeyboardButtonData("✏️ Edit Profil", "menu:edit"),
 		),
 		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData("⚖️ Legal & About", "menu:about"),
+			tgbotapi.NewInlineKeyboardButtonData("🗳️ Polling", "menu:polls"),
 			tgbotapi.NewInlineKeyboardButtonData("❓ Bantuan", "menu:help"),
+		),
+		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData("⚖️ Legal & About", "menu:about"),
 		),
 	)
 }

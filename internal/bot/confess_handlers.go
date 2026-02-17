@@ -53,6 +53,8 @@ func (b *Bot) handleConfessionInput(msg *tgbotapi.Message) {
 	}
 
 	b.db.SetUserState(telegramID, models.StateNone, "")
+	b.checkAchievements(telegramID)
+	b.processReward(telegramID, "confession_created")
 
 	b.sendMessage(telegramID, fmt.Sprintf(`✅ *Confession Terkirim!*
 

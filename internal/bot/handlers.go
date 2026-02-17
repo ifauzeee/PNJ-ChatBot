@@ -128,6 +128,7 @@ func (b *Bot) handleHelp(msg *tgbotapi.Message) {
 👤 <b>Profil & Achievement</b>
 /profile — Lihat profil & lencana
 /stats — Statistik kamu
+/leaderboard — Peringkat pengguna teraktif
 /edit — Edit data diri
 
 🛡️ <b>Keamanan & Legal</b>

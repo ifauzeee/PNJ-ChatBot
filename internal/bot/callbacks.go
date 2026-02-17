@@ -284,6 +284,10 @@ Atau ketik /cancel untuk membatalkan.
 		msg := &tgbotapi.Message{From: &tgbotapi.User{ID: telegramID}}
 		b.handleStats(msg)
 
+	case "leaderboard":
+		msg := &tgbotapi.Message{From: &tgbotapi.User{ID: telegramID}}
+		b.handleLeaderboard(msg)
+
 	case "edit":
 		kb := EditProfileKeyboard()
 		b.sendMessage(telegramID, "✏️ *Edit Profil*\n\nApa yang ingin kamu ubah?", &kb)
@@ -410,6 +414,7 @@ func (b *Bot) handleReactionCallback(telegramID int64, data string, callback *tg
 		b.checkAchievements(confession.AuthorID)
 	}
 	b.checkAchievements(telegramID)
+	b.processReward(telegramID, "reaction_given")
 
 	counts, _ := b.confession.GetReactionCounts(confessionID)
 	newKb := ConfessionReactionKeyboard(confessionID, counts)

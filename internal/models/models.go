@@ -106,20 +106,25 @@ func AvailableEntryYears() []int {
 }
 
 type User struct {
-	ID          int64      `json:"id" db:"id"`
-	TelegramID  int64      `json:"telegram_id" db:"telegram_id"`
-	Email       string     `json:"email" db:"email"`
-	Gender      Gender     `json:"gender" db:"gender"`
-	Department  Department `json:"department" db:"department"`
-	Year        int        `json:"year" db:"year"`
-	DisplayName string     `json:"display_name" db:"display_name"`
-	Karma       int        `json:"karma" db:"karma"`
-	IsVerified  bool       `json:"is_verified" db:"is_verified"`
-	IsBanned    bool       `json:"is_banned" db:"is_banned"`
-	ReportCount int        `json:"report_count" db:"report_count"`
-	TotalChats  int        `json:"total_chats" db:"total_chats"`
-	CreatedAt   time.Time  `json:"created_at" db:"created_at"`
-	UpdatedAt   time.Time  `json:"updated_at" db:"updated_at"`
+	ID           int64      `json:"id" db:"id"`
+	TelegramID   int64      `json:"telegram_id" db:"telegram_id"`
+	Email        string     `json:"email" db:"email"`
+	Gender       Gender     `json:"gender" db:"gender"`
+	Department   Department `json:"department" db:"department"`
+	Year         int        `json:"year" db:"year"`
+	DisplayName  string     `json:"display_name" db:"display_name"`
+	Karma        int        `json:"karma" db:"karma"`
+	IsVerified   bool       `json:"is_verified" db:"is_verified"`
+	IsBanned     bool       `json:"is_banned" db:"is_banned"`
+	ReportCount  int        `json:"report_count" db:"report_count"`
+	TotalChats   int        `json:"total_chats" db:"total_chats"`
+	Points       int        `json:"points" db:"points"`
+	Level        int        `json:"level" db:"level"`
+	Exp          int        `json:"exp" db:"exp"`
+	DailyStreak  int        `json:"daily_streak" db:"daily_streak"`
+	LastActiveAt time.Time  `json:"last_active_at" db:"last_active_at"`
+	CreatedAt    time.Time  `json:"created_at" db:"created_at"`
+	UpdatedAt    time.Time  `json:"updated_at" db:"updated_at"`
 }
 
 type UserState string

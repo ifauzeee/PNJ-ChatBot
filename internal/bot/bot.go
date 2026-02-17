@@ -49,22 +49,23 @@ var (
 )
 
 type Bot struct {
-	api        *tgbotapi.BotAPI
-	cfg        *config.Config
-	db         *database.DB
-	auth       *service.AuthService
-	chat       *service.ChatService
-	confession *service.ConfessionService
-	profile    *service.ProfileService
-	room       *service.RoomService
-	moderation *service.ModerationService
-	profanity  *service.ProfanityService
-	evidence   *service.EvidenceService
-	startedAt  time.Time
-	updateQ    chan tgbotapi.Update
-	updateWG   sync.WaitGroup
-	background sync.WaitGroup
-	userLocks  sync.Map
+	api          *tgbotapi.BotAPI
+	cfg          *config.Config
+	db           *database.DB
+	auth         *service.AuthService
+	chat         *service.ChatService
+	confession   *service.ConfessionService
+	profile      *service.ProfileService
+	room         *service.RoomService
+	moderation   *service.ModerationService
+	profanity    *service.ProfanityService
+	evidence     *service.EvidenceService
+	gamification *service.GamificationService
+	startedAt    time.Time
+	updateQ      chan tgbotapi.Update
+	updateWG     sync.WaitGroup
+	background   sync.WaitGroup
+	userLocks    sync.Map
 }
 
 func New(cfg *config.Config, db *database.DB) (*Bot, error) {
@@ -79,19 +80,20 @@ func New(cfg *config.Config, db *database.DB) (*Bot, error) {
 	redisSvc := service.NewRedisService()
 
 	bot := &Bot{
-		api:        api,
-		cfg:        cfg,
-		db:         db,
-		auth:       service.NewAuthService(db, emailSender, cfg),
-		chat:       service.NewChatService(db, redisSvc, cfg.MaxSearchPerMinute),
-		confession: service.NewConfessionService(db, cfg),
-		profile:    service.NewProfileService(db, cfg),
-		room:       service.NewRoomService(db),
-		moderation: service.NewModerationService(cfg),
-		profanity:  service.NewProfanityService(),
-		evidence:   service.NewEvidenceService(db, redisSvc.GetClient()),
-		startedAt:  time.Now(),
-		updateQ:    make(chan tgbotapi.Update, cfg.MaxUpdateQueue),
+		api:          api,
+		cfg:          cfg,
+		db:           db,
+		auth:         service.NewAuthService(db, emailSender, cfg),
+		chat:         service.NewChatService(db, redisSvc, cfg.MaxSearchPerMinute),
+		confession:   service.NewConfessionService(db, cfg),
+		profile:      service.NewProfileService(db, cfg),
+		room:         service.NewRoomService(db),
+		moderation:   service.NewModerationService(cfg),
+		profanity:    service.NewProfanityService(),
+		evidence:     service.NewEvidenceService(db, redisSvc.GetClient()),
+		gamification: service.NewGamificationService(db),
+		startedAt:    time.Now(),
+		updateQ:      make(chan tgbotapi.Update, cfg.MaxUpdateQueue),
 	}
 
 	logger.Info("🤖 Bot authorized", zap.String("username", api.Self.UserName))
@@ -264,6 +266,7 @@ func (b *Bot) Start(ctx context.Context) error {
 		{Command: "circles", Description: "👥 Gabung Group Circle Anonim"},
 		{Command: "profile", Description: "👤 Lihat profil kamu"},
 		{Command: "stats", Description: "📊 Statistik kamu"},
+		{Command: "leaderboard", Description: "🏆 Peringkat pengguna teraktif"},
 		{Command: "edit", Description: "✏️ Edit profil"},
 		{Command: "about", Description: "⚖️ Informasi hukum & disclaimer"},
 		{Command: "help", Description: "❓ Bantuan & panduan"},
@@ -337,6 +340,14 @@ func (b *Bot) handleUpdate(update tgbotapi.Update) {
 			userLockContentionTotal.WithLabelValues(userLabel).Inc()
 		}
 		defer lock.Unlock()
+
+		streak, bonus, _ := b.gamification.UpdateStreak(userID)
+		if bonus {
+			b.gamification.RewardActivity(userID, "streak_bonus")
+			b.sendMessageHTML(userID, fmt.Sprintf("🔥 <b>STREAK LANJUT!</b>\nKamu sudah aktif selama <b>%d hari</b> berturut-turut! Dapat bonus poin dan exp.", streak), nil)
+		} else {
+			b.gamification.RewardActivity(userID, "daily_login")
+		}
 	}
 
 	if update.CallbackQuery != nil {
@@ -450,6 +461,8 @@ func (b *Bot) handleCommand(msg *tgbotapi.Message) {
 			b.handleProfile(msg)
 		case "stats":
 			b.handleStats(msg)
+		case "leaderboard":
+			b.handleLeaderboard(msg)
 		case "admin_poll":
 			b.handleAdminPoll(msg)
 		case "broadcast":

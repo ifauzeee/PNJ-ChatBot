@@ -33,29 +33,49 @@ func (b *Bot) handleProfile(msg *tgbotapi.Message) {
 		badgeStr += "\n"
 	}
 
+	expNeeded := user.Level * 100 * user.Level
+	if expNeeded == 0 {
+		expNeeded = 100
+	}
+	progress := (float64(user.Exp) / float64(expNeeded)) * 10
+	progressBar := ""
+	for i := 0; i < 10; i++ {
+		if i < int(progress) {
+			progressBar += "■"
+		} else {
+			progressBar += "□"
+		}
+	}
+
 	profileText := fmt.Sprintf(`<b>👤 Profil Kamu</b>
 
 ━━━━━━━━━━━━━━━━━━━
-🏷️ <b>Nama Anonim:</b> %s
+🏷️ <b>Nama:</b> %s
+⭐ <b>Level %d</b>
+📊 <code>%s</code> (%d/%d EXP)
+💰 <b>Poin:</b> <b>%d</b>
+🔥 <b>Daily Streak:</b> <b>%d hari</b>
 ✨ <b>Karma:</b> <b>%d</b>
 %s <b>Gender:</b> %s
 🎓 <b>Angkatan:</b> %d
 %s <b>Jurusan:</b> %s
-📧 <b>Email:</b> %s
 ━━━━━━━━━━━━━━━━━━━
 📊 <b>Statistik:</b>
 💬 Total Chat: <b>%d</b>
 📝 Confessions: <b>%d</b>
-❤️ Reactions Diterima: <b>%d</b>
+❤️ Reactions: <b>%d</b>
 📅 Hari Aktif: <b>%d</b>%s
 ━━━━━━━━━━━━━━━━━━━
-⚠️ Report Count: %d/3`,
+🛡️ Status Laporan: %d/3`,
 		html.EscapeString(user.DisplayName),
+		user.Level,
+		progressBar, user.Exp, expNeeded,
+		user.Points,
+		user.DailyStreak,
 		user.Karma,
 		models.GenderEmoji(user.Gender), html.EscapeString(string(user.Gender)),
 		user.Year,
 		models.DepartmentEmoji(user.Department), html.EscapeString(string(user.Department)),
-		html.EscapeString(maskEmail(user.Email)),
 		totalChats,
 		totalConfessions,
 		totalReactions,
