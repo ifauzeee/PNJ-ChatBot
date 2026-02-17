@@ -164,7 +164,10 @@ func MainMenuKeyboard() tgbotapi.InlineKeyboardMarkup {
 			tgbotapi.NewInlineKeyboardButtonData("📊 Statistik", "menu:stats"),
 		),
 		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData("🗳️ Polling", "menu:polls"),
 			tgbotapi.NewInlineKeyboardButtonData("✏️ Edit Profil", "menu:edit"),
+		),
+		tgbotapi.NewInlineKeyboardRow(
 			tgbotapi.NewInlineKeyboardButtonData("❓ Bantuan", "menu:help"),
 		),
 	)
@@ -249,4 +252,18 @@ func BackToMenuKeyboard() tgbotapi.InlineKeyboardMarkup {
 			tgbotapi.NewInlineKeyboardButtonData("🔙 Menu Utama", "menu:main"),
 		),
 	)
+}
+
+func PollVoteKeyboard(pollID int64, options []*models.PollOption) tgbotapi.InlineKeyboardMarkup {
+	var rows [][]tgbotapi.InlineKeyboardButton
+	for _, opt := range options {
+		label := opt.OptionText
+		if opt.VoteCount > 0 {
+			label = fmt.Sprintf("%s (%d)", opt.OptionText, opt.VoteCount)
+		}
+		rows = append(rows, tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData(label, fmt.Sprintf("vote:%d:%d", pollID, opt.ID)),
+		))
+	}
+	return tgbotapi.NewInlineKeyboardMarkup(rows...)
 }

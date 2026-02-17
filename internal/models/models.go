@@ -201,3 +201,18 @@ type ConfessionReply struct {
 	Content      string    `json:"content"`
 	CreatedAt    time.Time `json:"created_at"`
 }
+
+type Poll struct {
+	ID        int64         `json:"id"`
+	AuthorID  int64         `json:"author_id"`
+	Question  string        `json:"question"`
+	Options   []*PollOption `json:"options"`
+	CreatedAt time.Time     `json:"created_at"`
+}
+
+type PollOption struct {
+	ID         int64  `json:"id"`
+	PollID     int64  `json:"poll_id"`
+	OptionText string `json:"option_text"`
+	VoteCount  int    `json:"vote_count"`
+}

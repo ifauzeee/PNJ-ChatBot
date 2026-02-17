@@ -159,6 +159,30 @@ func (d *DB) migrate() error {
 			FOREIGN KEY (confession_id) REFERENCES confessions(id),
 			FOREIGN KEY (author_id) REFERENCES users(telegram_id)
 		)`,
+		`CREATE TABLE IF NOT EXISTS polls (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			author_id INTEGER NOT NULL,
+			question TEXT NOT NULL,
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			FOREIGN KEY (author_id) REFERENCES users(telegram_id)
+		)`,
+		`CREATE TABLE IF NOT EXISTS poll_options (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			poll_id INTEGER NOT NULL,
+			option_text TEXT NOT NULL,
+			vote_count INTEGER DEFAULT 0,
+			FOREIGN KEY (poll_id) REFERENCES polls(id) ON DELETE CASCADE
+		)`,
+		`CREATE TABLE IF NOT EXISTS poll_votes (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			poll_id INTEGER NOT NULL,
+			telegram_id INTEGER NOT NULL,
+			option_id INTEGER NOT NULL,
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			UNIQUE(poll_id, telegram_id),
+			FOREIGN KEY (poll_id) REFERENCES polls(id) ON DELETE CASCADE,
+			FOREIGN KEY (telegram_id) REFERENCES users(telegram_id)
+		)`,
 
 		`CREATE INDEX IF NOT EXISTS idx_users_telegram_id ON users(telegram_id)`,
 		`CREATE INDEX IF NOT EXISTS idx_users_department ON users(department)`,

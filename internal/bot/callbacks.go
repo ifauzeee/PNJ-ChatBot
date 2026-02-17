@@ -37,6 +37,8 @@ func (b *Bot) handleCallback(callback *tgbotapi.CallbackQuery) {
 		b.handleMenuCallback(telegramID, value, callback)
 	case "edit":
 		b.handleEditCallback(telegramID, value, callback)
+	case "vote":
+		b.handleVoteCallback(telegramID, value, callback)
 	case "year":
 		b.handleYearCallback(telegramID, value, callback)
 	case "react":
@@ -256,6 +258,10 @@ Atau ketik /cancel untuk membatalkan.
 		msg := &tgbotapi.Message{From: &tgbotapi.User{ID: telegramID}}
 		b.handleConfessions(msg)
 
+	case "polls":
+		msg := &tgbotapi.Message{From: &tgbotapi.User{ID: telegramID}}
+		b.handleViewPolls(msg)
+
 	case "whisper":
 		kb := WhisperDeptKeyboard()
 		b.sendMessage(telegramID, "📢 *Whisper - Pesan Anonim ke Jurusan*\n\n🎯 Pilih jurusan tujuan:", &kb)
@@ -320,6 +326,31 @@ func (b *Bot) handleYearCallback(telegramID int64, value string, callback *tgbot
 		kb := DepartmentKeyboard()
 		b.sendMessage(telegramID, "🏛️ *Pilih Jurusan Kamu:*\n\nPilih jurusan di bawah ini:", &kb)
 	}
+}
+
+func (b *Bot) handleVoteCallback(telegramID int64, value string, callback *tgbotapi.CallbackQuery) {
+	parts := strings.Split(value, ":")
+	if len(parts) < 2 {
+		return
+	}
+
+	pollID, _ := strconv.ParseInt(parts[0], 10, 64)
+	optionID, _ := strconv.ParseInt(parts[1], 10, 64)
+
+	err := b.db.VotePoll(pollID, telegramID, optionID)
+	if err != nil {
+		b.answerCallback(callback.ID, "⚠️ "+err.Error())
+		return
+	}
+
+	poll, err := b.db.GetPoll(pollID)
+	if err == nil && poll != nil {
+		kb := PollVoteKeyboard(poll.ID, poll.Options)
+		editMsg := tgbotapi.NewEditMessageReplyMarkup(telegramID, callback.Message.MessageID, kb)
+		b.api.Send(editMsg)
+	}
+
+	b.answerCallback(callback.ID, "✅ Suara kamu berhasil direkam!")
 }
 
 func (b *Bot) handleReactionCallback(telegramID int64, data string, callback *tgbotapi.CallbackQuery) {
