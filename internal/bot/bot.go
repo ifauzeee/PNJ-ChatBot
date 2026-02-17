@@ -268,6 +268,8 @@ func (b *Bot) Start(ctx context.Context) error {
 		{Command: "about", Description: "⚖️ Informasi hukum & disclaimer"},
 		{Command: "help", Description: "❓ Bantuan & panduan"},
 		{Command: "cancel", Description: "❌ Batalkan aksi saat ini"},
+		{Command: "admin_poll", Description: "📢 (Admin) Buat polling global"},
+		{Command: "broadcast", Description: "📢 (Admin) Broadcast pesan global"},
 	}
 	cmdCfg := tgbotapi.NewSetMyCommands(commands...)
 	if _, err := b.api.Send(cmdCfg); err != nil {
@@ -448,6 +450,10 @@ func (b *Bot) handleCommand(msg *tgbotapi.Message) {
 			b.handleProfile(msg)
 		case "stats":
 			b.handleStats(msg)
+		case "admin_poll":
+			b.handleAdminPoll(msg)
+		case "broadcast":
+			b.handleBroadcast(msg)
 		case "edit":
 			b.handleEdit(msg)
 		case "report":

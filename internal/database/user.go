@@ -254,3 +254,15 @@ func (d *DB) IsUserProfileComplete(telegramID int64) (bool, error) {
 	}
 	return user.IsVerified && string(user.Gender) != "" && string(user.Department) != "" && user.Year != 0, nil
 }
+
+func (d *DB) GetAllVerifiedUsers() ([]int64, error) {
+	var ids []int64
+	query, args, err := d.Builder.Select("telegram_id").From("users").
+		Where(squirrel.Eq{"is_verified": true, "is_banned": false}).ToSql()
+	if err != nil {
+		return nil, err
+	}
+
+	err = d.Select(&ids, query, args...)
+	return ids, err
+}
