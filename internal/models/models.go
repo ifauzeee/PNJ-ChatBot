@@ -200,6 +200,7 @@ type Report struct {
 	ReporterID    int64     `json:"reporter_id" db:"reporter_id"`
 	ReportedID    int64     `json:"reported_id" db:"reported_id"`
 	Reason        string    `json:"reason" db:"reason"`
+	Evidence      string    `json:"evidence" db:"evidence"`
 	ChatSessionID int64     `json:"chat_session_id" db:"chat_session_id"`
 	CreatedAt     time.Time `json:"created_at" db:"created_at"`
 }

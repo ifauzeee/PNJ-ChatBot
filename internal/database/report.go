@@ -3,17 +3,25 @@ package database
 import (
 	"fmt"
 	"time"
+
+	"github.com/pnj-anonymous-bot/internal/models"
 )
 
-func (d *DB) CreateReport(reporterID, reportedID int64, reason string, chatSessionID int64) error {
+func (d *DB) CreateReport(reporterID, reportedID int64, reason, evidence string, chatSessionID int64) error {
 	_, err := d.Exec(
-		`INSERT INTO reports (reporter_id, reported_id, reason, chat_session_id, created_at) VALUES (?, ?, ?, ?, ?)`,
-		reporterID, reportedID, reason, chatSessionID, time.Now(),
+		`INSERT INTO reports (reporter_id, reported_id, reason, evidence, chat_session_id, created_at) VALUES (?, ?, ?, ?, ?, ?)`,
+		reporterID, reportedID, reason, evidence, chatSessionID, time.Now(),
 	)
 	if err != nil {
 		return fmt.Errorf("failed to create report: %w", err)
 	}
 	return nil
+}
+
+func (d *DB) GetReport(reportID int64) (*models.Report, error) {
+	var r models.Report
+	err := d.Get(&r, `SELECT * FROM reports WHERE id = ?`, reportID)
+	return &r, err
 }
 
 func (d *DB) GetUserReportCount(telegramID int64, since time.Time) (int, error) {

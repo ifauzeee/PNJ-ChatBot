@@ -11,8 +11,6 @@ type ProfanityService struct {
 }
 
 func NewProfanityService() *ProfanityService {
-	// Common Indonesian and English profanity
-	// Note: This is an initial list, can be expanded or loaded from a file/DB
 	words := []string{
 		"anjing", "anjrit", "anjeng", "ancuk", "asu", "bangsat", "bego", "tolol", "goblok",
 		"kontal", "kontol", "memek", "jembut", "peler", "itil", "ngewe", "entot",
@@ -32,7 +30,6 @@ func createProfanityRegex(words []string) *regexp.Regexp {
 	for _, w := range words {
 		escapedWords = append(escapedWords, regexp.QuoteMeta(w))
 	}
-	// Case-insensitive match for the words
 	pattern := `(?i)\b(` + strings.Join(escapedWords, "|") + `)\b`
 	return regexp.MustCompile(pattern)
 }

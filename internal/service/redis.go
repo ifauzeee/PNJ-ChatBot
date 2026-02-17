@@ -42,6 +42,10 @@ func NewRedisService() *RedisService {
 	}
 }
 
+func (r *RedisService) GetClient() *redis.Client {
+	return r.client
+}
+
 func (r *RedisService) AddToQueue(telegramID int64, data string) error {
 	key := "chat_queue"
 	val := fmt.Sprintf("%d:%s", telegramID, data)

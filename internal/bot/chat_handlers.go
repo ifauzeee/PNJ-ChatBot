@@ -199,6 +199,29 @@ func (b *Bot) handleChatMessage(msg *tgbotapi.Message) {
 		return
 	}
 
+	session, _ := b.db.GetActiveSession(telegramID)
+	if session != nil {
+		msgType := "text"
+		content := msg.Text
+		if msg.Sticker != nil {
+			msgType = "sticker"
+			content = "Sticker:" + msg.Sticker.FileID
+		} else if msg.Photo != nil {
+			msgType = "photo"
+			content = "Photo:" + msg.Photo[len(msg.Photo)-1].FileID
+		} else if msg.Voice != nil {
+			msgType = "voice"
+			content = "Voice:" + msg.Voice.FileID
+		} else if msg.Video != nil {
+			msgType = "video"
+			content = "Video:" + msg.Video.FileID
+		} else if msg.Animation != nil {
+			msgType = "animation"
+			content = "Animation:" + msg.Animation.FileID
+		}
+		b.evidence.LogMessage(session.ID, telegramID, content, msgType)
+	}
+
 	if msg.Text != "" {
 		text := msg.Text
 		if b.profanity.IsBad(text) {

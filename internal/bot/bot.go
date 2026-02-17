@@ -59,6 +59,7 @@ type Bot struct {
 	room       *service.RoomService
 	moderation *service.ModerationService
 	profanity  *service.ProfanityService
+	evidence   *service.EvidenceService
 	startedAt  time.Time
 	updateQ    chan tgbotapi.Update
 	updateWG   sync.WaitGroup
@@ -88,6 +89,7 @@ func New(cfg *config.Config, db *database.DB) (*Bot, error) {
 		room:       service.NewRoomService(db),
 		moderation: service.NewModerationService(cfg),
 		profanity:  service.NewProfanityService(),
+		evidence:   service.NewEvidenceService(db, redisSvc.GetClient()),
 		startedAt:  time.Now(),
 		updateQ:    make(chan tgbotapi.Update, cfg.MaxUpdateQueue),
 	}

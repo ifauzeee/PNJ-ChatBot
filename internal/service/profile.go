@@ -89,7 +89,7 @@ func (s *ProfileService) UpdateDepartment(telegramID int64, dept string) error {
 	return s.db.UpdateUserDepartment(telegramID, dept)
 }
 
-func (s *ProfileService) ReportUser(reporterID, reportedID int64, reason string, chatSessionID int64) (int, error) {
+func (s *ProfileService) ReportUser(reporterID, reportedID int64, reason, evidence string, chatSessionID int64) (int, error) {
 
 	count, err := s.db.GetUserReportCount(reporterID, time.Now().Add(-24*time.Hour))
 	if err != nil {
@@ -99,7 +99,7 @@ func (s *ProfileService) ReportUser(reporterID, reportedID int64, reason string,
 		return 0, fmt.Errorf("kamu sudah mencapai batas laporan per hari")
 	}
 
-	if err := s.db.CreateReport(reporterID, reportedID, reason, chatSessionID); err != nil {
+	if err := s.db.CreateReport(reporterID, reportedID, reason, evidence, chatSessionID); err != nil {
 		return 0, err
 	}
 

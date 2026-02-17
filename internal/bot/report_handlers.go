@@ -42,11 +42,13 @@ func (b *Bot) handleReportInput(msg *tgbotapi.Message) {
 
 	session, _ := b.db.GetActiveSession(telegramID)
 	sessionID := int64(0)
+	evidenceText := ""
 	if session != nil {
 		sessionID = session.ID
+		evidenceText, _ = b.evidence.GetEvidence(sessionID)
 	}
 
-	newCount, err := b.profile.ReportUser(telegramID, reportedID, msg.Text, sessionID)
+	newCount, err := b.profile.ReportUser(telegramID, reportedID, msg.Text, evidenceText, sessionID)
 	if err != nil {
 		b.sendMessageHTML(telegramID, fmt.Sprintf("⚠️ <b>%s</b>", html.EscapeString(err.Error())), nil)
 		return
