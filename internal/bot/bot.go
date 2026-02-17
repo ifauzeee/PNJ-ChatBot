@@ -184,6 +184,7 @@ func (b *Bot) Start() {
 		{Command: "profile", Description: "👤 Lihat profil kamu"},
 		{Command: "stats", Description: "📊 Statistik kamu"},
 		{Command: "edit", Description: "✏️ Edit profil"},
+		{Command: "about", Description: "⚖️ Informasi hukum & disclaimer"},
 		{Command: "help", Description: "❓ Bantuan & panduan"},
 		{Command: "cancel", Description: "❌ Batalkan aksi saat ini"},
 	}
@@ -234,6 +235,8 @@ func (b *Bot) handleCommand(msg *tgbotapi.Message) {
 		b.handleRegist(msg)
 	case "help":
 		b.handleHelp(msg)
+	case "about":
+		b.handleAbout(msg)
 	case "cancel":
 		b.handleCancel(msg)
 	default:

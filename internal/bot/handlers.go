@@ -22,15 +22,22 @@ func (b *Bot) handleStart(msg *tgbotapi.Message) {
 	}
 
 	if !user.IsVerified {
-		welcomeText := fmt.Sprintf(`🎭 <b>Selamat Datang di PNJ Anonymous Bot!</b>
+		welcomeText := fmt.Sprintf(`<b>🎭 Selamat Datang di PNJ Anonymous Bot!</b>
 
 Hai <b>%s</b>! 👋
 
 Bot ini adalah platform anonim khusus untuk <b>mahasiswa Politeknik Negeri Jakarta</b> 🏛️
 
+━━━━━━━━━━━━━━━━━━━
+⚖️ <b>DISCLAIMER & LEGAL:</b>
+Bot ini adalah <b>PROYEK INDEPENDEN</b> yang dibuat oleh mahasiswa untuk mahasiswa.
+Bot ini <b>TIDAK berafiliasi, disponsori, atau disetujui secara resmi</b> oleh pihak institusi Politeknik Negeri Jakarta (PNJ).
+Segala konten dan interaksi di dalam bot ini adalah tanggung jawab masing-masing pengguna.
+━━━━━━━━━━━━━━━━━━━
+
 ⚠️ <b>Email belum diverifikasi!</b>
 
-Ketik /regist dan ikuti proses verifikasi email PNJ kamu.`, msg.From.FirstName)
+Ketik /regist dan ikuti proses verifikasi email PNJ kamu.`, html.EscapeString(msg.From.FirstName))
 
 		b.sendMessageHTML(telegramID, welcomeText, nil)
 		return
@@ -124,48 +131,62 @@ Antrian chat: <b>%d</b>
 }
 
 func (b *Bot) handleHelp(msg *tgbotapi.Message) {
-	helpText := `❓ *Panduan PNJ Anonymous Bot*
+	helpText := `<b>❓ Panduan PNJ Anonymous Bot</b>
 
 ━━━━━━━━━━━━━━━━━━━
-🔍 *Chat Anonim*
-━━━━━━━━━━━━━━━━━━━
+🔍 <b>Chat Anonim</b>
 /search — Cari partner chat
 /next — Skip ke partner baru
 /stop — Hentikan chat
 
-━━━━━━━━━━━━━━━━━━━
-💬 *Confession & Whisper*
-━━━━━━━━━━━━━━━━━━━
+💬 <b>Fitur Interaksi</b>
 /confess — Kirim confession anonim
-/confessions — Lihat confession terbaru
-/whisper — Kirim pesan ke jurusan
+/reply — Balas confession
+/poll — Buat polling anonim
+/whisper — Pesan ke jurusan
 
-━━━━━━━━━━━━━━━━━━━
-👤 *Profil & Settings*
-━━━━━━━━━━━━━━━━━━━
-/profile — Lihat profil kamu
-/stats — Statistik interaksi
-/edit — Edit profil
+👤 <b>Profil & Achievement</b>
+/profile — Lihat profil & lencana
+/stats — Statistik kamu
+/edit — Edit data diri
 
-━━━━━━━━━━━━━━━━━━━
-🛡️ *Keamanan*
-━━━━━━━━━━━━━━━━━━━
-/report — Laporkan partner
-/block — Block partner
-/cancel — Batalkan aksi saat ini
+🛡️ <b>Keamanan & Legal</b>
+/report — Laporkan pelanggaran
+/about — Informasi hukum & privasi
+/cancel — Batalkan aksi
 
-━━━━━━━━━━━━━━━━━━━
-📌 *Aturan:*
-1️⃣ Jaga kesopanan dalam berkomunikasi
-2️⃣ Dilarang menyebarkan konten SARA
-3️⃣ Dilarang spam atau flood
-4️⃣ Hormati privasi pengguna lain
-5️⃣ Pelanggaran = auto-ban setelah 3 report
+⚖️ <b>Ketentuan Layanan:</b>
+1. Bot ini <b>UNOFFICIAL</b> (Bukan resmi dari PNJ).
+2. Pengguna wajib menjaga etika & kesopanan.
+3. Konten SARA/Pelecehan = <b>BANNED PERMANEN.</b>
+4. Kami tidak menyimpan data pribadi selain email PNJ untuk verifikasi.
 
-_Politeknik Negeri Jakarta © 2026_`
+<i>Dibuat dengan ❤️ oleh Mahasiswa PNJ (Unofficial Project)</i>`
 
 	kb := BackToMenuKeyboard()
-	b.sendMessage(msg.From.ID, helpText, &kb)
+	b.sendMessageHTML(msg.From.ID, helpText, &kb)
+}
+
+func (b *Bot) handleAbout(msg *tgbotapi.Message) {
+	aboutText := `<b>⚖️ Informasi Hukum & Disclaimer</b>
+
+━━━━━━━━━━━━━━━━━━━
+<b>Disclaimer Afiliasi:</b>
+Platform ini adalah layanan independen yang dikembangkan oleh sekelompok mahasiswa untuk tujuan sosial dan komunikasi antar mahasiswa. PNJ Anonymous Bot <b>TIDAK MEMILIKI HUBUNGAN AFILIASI</b> dengan manajemen Politeknik Negeri Jakarta (PNJ). Segala bentuk logo atau nama "PNJ" digunakan semata-mata untuk menunjukkan target demografis pengguna (mahasiswa PNJ).
+
+<b>Tanggung Jawab Konten:</b>
+Seluruh pesan, confession, dan polling yang dikirimkan melalui bot ini adalah tanggung jawab sepenuhnya dari <b>PENGIRIM (USER)</b>. Pengembang bot tidak bertanggung jawab atas segala bentuk kerugian, pencemaran nama baik, atau masalah hukum yang timbul akibat penyalahgunaan layanan ini.
+
+<b>Privasi & Data:</b>
+Kami hanya menyimpan alamat email PNJ untuk memastikan sistem hanya digunakan oleh mahasiswa aktif. Kami berkomitmen untuk menjaga kerahasiaan identitas anonim Anda dan tidak akan pernah membocorkan identitas pengirim pesan kecuali diminta secara resmi oleh pihak berwenang melalui jalur hukum yang berlaku di Indonesia.
+
+<b>Persetujuan:</b>
+Dengan menggunakan bot ini, Anda dianggap telah membaca dan menyetujui seluruh ketentuan di atas.
+
+<i>Stay Anonymous, Stay Responsible.</i>`
+
+	kb := BackToMenuKeyboard()
+	b.sendMessageHTML(msg.From.ID, aboutText, &kb)
 }
 
 func (b *Bot) handleCancel(msg *tgbotapi.Message) {

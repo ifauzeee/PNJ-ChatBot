@@ -168,6 +168,7 @@ func MainMenuKeyboard() tgbotapi.InlineKeyboardMarkup {
 			tgbotapi.NewInlineKeyboardButtonData("✏️ Edit Profil", "menu:edit"),
 		),
 		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData("⚖️ Legal & About", "menu:about"),
 			tgbotapi.NewInlineKeyboardButtonData("❓ Bantuan", "menu:help"),
 		),
 	)

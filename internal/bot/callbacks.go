@@ -281,6 +281,10 @@ Atau ketik /cancel untuk membatalkan.
 	case "help":
 		msg := &tgbotapi.Message{From: &tgbotapi.User{ID: telegramID}}
 		b.handleHelp(msg)
+
+	case "about":
+		msg := &tgbotapi.Message{From: &tgbotapi.User{ID: telegramID}}
+		b.handleAbout(msg)
 	}
 }
 
