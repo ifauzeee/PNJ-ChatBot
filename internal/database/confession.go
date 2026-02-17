@@ -81,6 +81,13 @@ func (d *DB) AddConfessionReaction(confessionID, telegramID int64, reaction stri
 		) WHERE id = ?`,
 		confessionID, confessionID,
 	)
+
+	var authorID int64
+	err = d.QueryRow(`SELECT author_id FROM confessions WHERE id = ?`, confessionID).Scan(&authorID)
+	if err == nil && authorID != telegramID {
+		d.IncrementUserKarma(authorID, 1)
+	}
+
 	return err
 }
 

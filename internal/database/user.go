@@ -22,12 +22,12 @@ func (d *DB) CreateUser(telegramID int64) (*models.User, error) {
 func (d *DB) GetUser(telegramID int64) (*models.User, error) {
 	user := &models.User{}
 	err := d.QueryRow(
-		`SELECT id, telegram_id, email, gender, department, year, display_name, 
+		`SELECT id, telegram_id, email, gender, department, year, display_name, karma, 
 		        is_verified, is_banned, report_count, total_chats, created_at, updated_at 
 		 FROM users WHERE telegram_id = ?`, telegramID,
 	).Scan(
 		&user.ID, &user.TelegramID, &user.Email, &user.Gender, &user.Department, &user.Year,
-		&user.DisplayName, &user.IsVerified, &user.IsBanned, &user.ReportCount,
+		&user.DisplayName, &user.Karma, &user.IsVerified, &user.IsBanned, &user.ReportCount,
 		&user.TotalChats, &user.CreatedAt, &user.UpdatedAt,
 	)
 	if err == sql.ErrNoRows {
@@ -83,6 +83,14 @@ func (d *DB) UpdateUserDisplayName(telegramID int64, name string) error {
 	_, err := d.Exec(
 		`UPDATE users SET display_name = ?, updated_at = ? WHERE telegram_id = ?`,
 		name, time.Now(), telegramID,
+	)
+	return err
+}
+
+func (d *DB) IncrementUserKarma(telegramID int64, amount int) error {
+	_, err := d.Exec(
+		`UPDATE users SET karma = karma + ?, updated_at = ? WHERE telegram_id = ?`,
+		amount, time.Now(), telegramID,
 	)
 	return err
 }

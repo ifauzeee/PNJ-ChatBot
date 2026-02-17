@@ -58,7 +58,7 @@ func (d *DB) FindMatch(telegramID int64, preferredDept, preferredGender string, 
 				 UNION
 				 SELECT user_id FROM blocked_users WHERE blocked_id = ?
 			 )
-			 ORDER BY cq.joined_at ASC
+			 ORDER BY u.karma DESC, cq.joined_at ASC
 			 LIMIT 1`
 	args = append(args, telegramID, telegramID)
 
@@ -70,6 +70,37 @@ func (d *DB) FindMatch(telegramID int64, preferredDept, preferredGender string, 
 		return 0, fmt.Errorf("failed to find match: %w", err)
 	}
 	return matchID, nil
+}
+
+func (d *DB) StopChat(telegramID int64) (int64, error) {
+	session, err := d.GetActiveSession(telegramID)
+	if err != nil {
+		return 0, err
+	}
+	if session == nil {
+		return 0, nil
+	}
+
+	partnerID := session.User1ID
+	if session.User1ID == telegramID {
+		partnerID = session.User2ID
+	}
+
+	err = d.EndChatSession(session.ID)
+	if err != nil {
+		return 0, fmt.Errorf("failed to end chat session: %w", err)
+	}
+
+	duration := time.Since(session.StartedAt).Minutes()
+	if duration >= 10 {
+		d.IncrementUserKarma(session.User1ID, 2)
+		d.IncrementUserKarma(session.User2ID, 2)
+	} else if duration >= 5 {
+		d.IncrementUserKarma(session.User1ID, 1)
+		d.IncrementUserKarma(session.User2ID, 1)
+	}
+
+	return partnerID, nil
 }
 
 func (d *DB) GetQueueCount() (int, error) {

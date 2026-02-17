@@ -90,6 +90,7 @@ type User struct {
 	Department  Department `json:"department"`
 	Year        int        `json:"year"`
 	DisplayName string     `json:"display_name"`
+	Karma       int        `json:"karma"`
 	IsVerified  bool       `json:"is_verified"`
 	IsBanned    bool       `json:"is_banned"`
 	ReportCount int        `json:"report_count"`

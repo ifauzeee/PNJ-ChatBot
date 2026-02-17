@@ -601,6 +601,7 @@ func (b *Bot) handleProfile(msg *tgbotapi.Message) {
 
 ━━━━━━━━━━━━━━━━━━━
 🏷️ *Nama Anonim:* %s
+✨ *Karma:* *%d*
 %s *Gender:* %s
 🎓 *Angkatan:* %d
 %s *Jurusan:* %s
@@ -614,6 +615,7 @@ func (b *Bot) handleProfile(msg *tgbotapi.Message) {
 ━━━━━━━━━━━━━━━━━━━
 ⚠️ Report Count: %d/3`,
 		user.DisplayName,
+		user.Karma,
 		models.GenderEmoji(user.Gender), string(user.Gender),
 		user.Year,
 		models.DepartmentEmoji(user.Department), string(user.Department),
@@ -632,6 +634,12 @@ func (b *Bot) handleProfile(msg *tgbotapi.Message) {
 func (b *Bot) handleStats(msg *tgbotapi.Message) {
 	telegramID := msg.From.ID
 
+	user, err := b.db.GetUser(telegramID)
+	if err != nil || user == nil {
+		b.sendMessage(telegramID, "❌ Gagal memuat profil.", nil)
+		return
+	}
+
 	totalChats, totalConfessions, totalReactions, daysSince, err := b.profile.GetStats(telegramID)
 	if err != nil {
 		b.sendMessage(telegramID, "❌ Gagal memuat statistik.", nil)
@@ -641,6 +649,7 @@ func (b *Bot) handleStats(msg *tgbotapi.Message) {
 	statsText := fmt.Sprintf(`📊 *Statistik Kamu*
 
 ━━━━━━━━━━━━━━━━━━━
+✨ Total Karma: *%d*
 💬 Total Chat: *%d*
 📝 Confession Dibuat: *%d*
 ❤️ Reactions Diterima: *%d*
@@ -648,7 +657,7 @@ func (b *Bot) handleStats(msg *tgbotapi.Message) {
 ━━━━━━━━━━━━━━━━━━━
 
 _Terus berinteraksi untuk meningkatkan statistik kamu!_ 🚀`,
-		totalChats, totalConfessions, totalReactions, daysSince)
+		user.Karma, totalChats, totalConfessions, totalReactions, daysSince)
 
 	kb := BackToMenuKeyboard()
 	b.sendMessage(telegramID, statsText, &kb)
