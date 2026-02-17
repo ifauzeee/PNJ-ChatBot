@@ -3,16 +3,26 @@ package database
 import (
 	"database/sql"
 	"fmt"
+	"strings"
 	"time"
 
+	"github.com/Masterminds/squirrel"
 	"github.com/pnj-anonymous-bot/internal/models"
 )
 
 func (d *DB) CreateUser(telegramID int64) (*models.User, error) {
-	_, err := d.Exec(
-		`INSERT OR IGNORE INTO users (telegram_id, created_at, updated_at) VALUES (?, ?, ?)`,
-		telegramID, time.Now(), time.Now(),
-	)
+	query, args, err := d.Builder.Insert("users").
+		Columns("telegram_id", "created_at", "updated_at").
+		Values(telegramID, time.Now(), time.Now()).
+		ToSql()
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to build query: %w", err)
+	}
+
+	query = d.PrepareQuery(strings.Replace(query, "INSERT INTO", "INSERT OR IGNORE INTO", 1))
+
+	_, err = d.DB.Exec(query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create user: %w", err)
 	}
@@ -21,15 +31,17 @@ func (d *DB) CreateUser(telegramID int64) (*models.User, error) {
 
 func (d *DB) GetUser(telegramID int64) (*models.User, error) {
 	user := &models.User{}
-	err := d.QueryRow(
-		`SELECT id, telegram_id, email, gender, department, year, display_name, karma, 
-		        is_verified, is_banned, report_count, total_chats, created_at, updated_at 
-		 FROM users WHERE telegram_id = ?`, telegramID,
-	).Scan(
-		&user.ID, &user.TelegramID, &user.Email, &user.Gender, &user.Department, &user.Year,
-		&user.DisplayName, &user.Karma, &user.IsVerified, &user.IsBanned, &user.ReportCount,
-		&user.TotalChats, &user.CreatedAt, &user.UpdatedAt,
-	)
+	query, args, err := d.Builder.Select(
+		"id", "telegram_id", "email", "gender", "department", "year",
+		"display_name", "karma", "is_verified", "is_banned",
+		"report_count", "total_chats", "created_at", "updated_at",
+	).From("users").Where("telegram_id = ?", telegramID).ToSql()
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to build query: %w", err)
+	}
+
+	err = d.DB.Get(user, query, args...)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -40,146 +52,201 @@ func (d *DB) GetUser(telegramID int64) (*models.User, error) {
 }
 
 func (d *DB) UpdateUserEmail(telegramID int64, email string) error {
-	_, err := d.Exec(
-		`UPDATE users SET email = ?, updated_at = ? WHERE telegram_id = ?`,
-		email, time.Now(), telegramID,
-	)
+	query, args, err := d.Builder.Update("users").
+		Set("email", email).
+		Set("updated_at", time.Now()).
+		Where("telegram_id = ?", telegramID).
+		ToSql()
+	if err != nil {
+		return err
+	}
+	_, err = d.DB.Exec(query, args...)
 	return err
 }
 
 func (d *DB) UpdateUserVerified(telegramID int64, verified bool) error {
-	_, err := d.Exec(
-		`UPDATE users SET is_verified = ?, updated_at = ? WHERE telegram_id = ?`,
-		verified, time.Now(), telegramID,
-	)
+	query, args, err := d.Builder.Update("users").
+		Set("is_verified", verified).
+		Set("updated_at", time.Now()).
+		Where("telegram_id = ?", telegramID).
+		ToSql()
+	if err != nil {
+		return err
+	}
+	_, err = d.DB.Exec(query, args...)
 	return err
 }
 
 func (d *DB) UpdateUserGender(telegramID int64, gender string) error {
-	_, err := d.Exec(
-		`UPDATE users SET gender = ?, updated_at = ? WHERE telegram_id = ?`,
-		gender, time.Now(), telegramID,
-	)
+	query, args, err := d.Builder.Update("users").
+		Set("gender", gender).
+		Set("updated_at", time.Now()).
+		Where("telegram_id = ?", telegramID).
+		ToSql()
+	if err != nil {
+		return err
+	}
+	_, err = d.DB.Exec(query, args...)
 	return err
 }
 
 func (d *DB) UpdateUserDepartment(telegramID int64, dept string) error {
-	_, err := d.Exec(
-		`UPDATE users SET department = ?, updated_at = ? WHERE telegram_id = ?`,
-		dept, time.Now(), telegramID,
-	)
+	query, args, err := d.Builder.Update("users").
+		Set("department", dept).
+		Set("updated_at", time.Now()).
+		Where("telegram_id = ?", telegramID).
+		ToSql()
+	if err != nil {
+		return err
+	}
+	_, err = d.DB.Exec(query, args...)
 	return err
 }
 
 func (d *DB) UpdateUserYear(telegramID int64, year int) error {
-	_, err := d.Exec(
-		`UPDATE users SET year = ?, updated_at = ? WHERE telegram_id = ?`,
-		year, time.Now(), telegramID,
-	)
+	query, args, err := d.Builder.Update("users").
+		Set("year", year).
+		Set("updated_at", time.Now()).
+		Where("telegram_id = ?", telegramID).
+		ToSql()
+	if err != nil {
+		return err
+	}
+	_, err = d.DB.Exec(query, args...)
 	return err
 }
 
 func (d *DB) UpdateUserDisplayName(telegramID int64, name string) error {
-	_, err := d.Exec(
-		`UPDATE users SET display_name = ?, updated_at = ? WHERE telegram_id = ?`,
-		name, time.Now(), telegramID,
-	)
+	query, args, err := d.Builder.Update("users").
+		Set("display_name", name).
+		Set("updated_at", time.Now()).
+		Where("telegram_id = ?", telegramID).
+		ToSql()
+	if err != nil {
+		return err
+	}
+	_, err = d.DB.Exec(query, args...)
 	return err
 }
 
 func (d *DB) IncrementUserKarma(telegramID int64, amount int) error {
-	_, err := d.Exec(
-		`UPDATE users SET karma = karma + ?, updated_at = ? WHERE telegram_id = ?`,
-		amount, time.Now(), telegramID,
-	)
+	query, args, err := d.Builder.Update("users").
+		Set("karma", squirrel.Expr("karma + ?", amount)).
+		Set("updated_at", time.Now()).
+		Where("telegram_id = ?", telegramID).
+		ToSql()
+	if err != nil {
+		return err
+	}
+	_, err = d.DB.Exec(query, args...)
 	return err
 }
 
 func (d *DB) UpdateUserBanned(telegramID int64, banned bool) error {
-	_, err := d.Exec(
-		`UPDATE users SET is_banned = ?, updated_at = ? WHERE telegram_id = ?`,
-		banned, time.Now(), telegramID,
-	)
+	query, args, err := d.Builder.Update("users").
+		Set("is_banned", banned).
+		Set("updated_at", time.Now()).
+		Where("telegram_id = ?", telegramID).
+		ToSql()
+	if err != nil {
+		return err
+	}
+	_, err = d.DB.Exec(query, args...)
 	return err
 }
 
 func (d *DB) IncrementReportCount(telegramID int64) (int, error) {
-	_, err := d.Exec(
-		`UPDATE users SET report_count = report_count + 1, updated_at = ? WHERE telegram_id = ?`,
-		time.Now(), telegramID,
-	)
+	query, args, err := d.Builder.Update("users").
+		Set("report_count", squirrel.Expr("report_count + 1")).
+		Set("updated_at", time.Now()).
+		Where("telegram_id = ?", telegramID).
+		ToSql()
+	if err != nil {
+		return 0, err
+	}
+	_, err = d.DB.Exec(query, args...)
 	if err != nil {
 		return 0, err
 	}
 
 	var count int
-	err = d.QueryRow(`SELECT report_count FROM users WHERE telegram_id = ?`, telegramID).Scan(&count)
+	query, args, _ = d.Builder.Select("report_count").From("users").Where("telegram_id = ?", telegramID).ToSql()
+	err = d.DB.Get(&count, query, args...)
 	return count, err
 }
 
 func (d *DB) IncrementTotalChats(telegramID int64) error {
-	_, err := d.Exec(
-		`UPDATE users SET total_chats = total_chats + 1, updated_at = ? WHERE telegram_id = ?`,
-		time.Now(), telegramID,
-	)
+	query, args, err := d.Builder.Update("users").
+		Set("total_chats", squirrel.Expr("total_chats + 1")).
+		Set("updated_at", time.Now()).
+		Where("telegram_id = ?", telegramID).
+		ToSql()
+	if err != nil {
+		return err
+	}
+	_, err = d.DB.Exec(query, args...)
 	return err
 }
 
 func (d *DB) SetUserState(telegramID int64, state models.UserState, data string) error {
-	_, err := d.Exec(
-		`UPDATE users SET state = ?, state_data = ?, updated_at = ? WHERE telegram_id = ?`,
-		string(state), data, time.Now(), telegramID,
-	)
+	query, args, err := d.Builder.Update("users").
+		Set("state", string(state)).
+		Set("state_data", data).
+		Set("updated_at", time.Now()).
+		Where("telegram_id = ?", telegramID).
+		ToSql()
+	if err != nil {
+		return err
+	}
+	_, err = d.DB.Exec(query, args...)
 	return err
 }
 
 func (d *DB) GetUserState(telegramID int64) (models.UserState, string, error) {
-	var state, data string
-	err := d.QueryRow(
-		`SELECT COALESCE(state, ''), COALESCE(state_data, '') FROM users WHERE telegram_id = ?`,
-		telegramID,
-	).Scan(&state, &data)
+	var res struct {
+		State string `db:"state"`
+		Data  string `db:"state_data"`
+	}
+	query, args, err := d.Builder.Select("COALESCE(state, '') as state", "COALESCE(state_data, '') as state_data").
+		From("users").Where("telegram_id = ?", telegramID).ToSql()
+	if err != nil {
+		return models.StateNone, "", err
+	}
+
+	err = d.DB.Get(&res, query, args...)
 	if err == sql.ErrNoRows {
 		return models.StateNone, "", nil
 	}
-	return models.UserState(state), data, err
+	return models.UserState(res.State), res.Data, err
 }
 
 func (d *DB) GetOnlineUserCount() (int, error) {
 	var count int
-	err := d.QueryRow(`SELECT COUNT(*) FROM users WHERE is_verified = TRUE AND is_banned = FALSE`).Scan(&count)
+	query, args, _ := d.Builder.Select("COUNT(*)").From("users").
+		Where(squirrel.Eq{"is_verified": true, "is_banned": false}).ToSql()
+	err := d.DB.Get(&count, query, args...)
 	return count, err
 }
 
 func (d *DB) GetDepartmentUserCount(dept string) (int, error) {
 	var count int
-	err := d.QueryRow(
-		`SELECT COUNT(*) FROM users WHERE department = ? AND is_verified = TRUE AND is_banned = FALSE`,
-		dept,
-	).Scan(&count)
+	query, args, _ := d.Builder.Select("COUNT(*)").From("users").
+		Where(squirrel.Eq{"department": dept, "is_verified": true, "is_banned": false}).ToSql()
+	err := d.DB.Get(&count, query, args...)
 	return count, err
 }
 
 func (d *DB) GetUsersByDepartment(dept string, excludeTelegramID int64) ([]int64, error) {
-	rows, err := d.Query(
-		`SELECT telegram_id FROM users 
-		 WHERE department = ? AND is_verified = TRUE AND is_banned = FALSE AND telegram_id != ?`,
-		dept, excludeTelegramID,
-	)
+	var ids []int64
+	query, args, err := d.Builder.Select("telegram_id").From("users").
+		Where(squirrel.Eq{"department": dept, "is_verified": true, "is_banned": false}).
+		Where(squirrel.NotEq{"telegram_id": excludeTelegramID}).ToSql()
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
 
-	var ids []int64
-	for rows.Next() {
-		var id int64
-		if err := rows.Scan(&id); err != nil {
-			return nil, err
-		}
-		ids = append(ids, id)
-	}
-	return ids, nil
+	err = d.DB.Select(&ids, query, args...)
+	return ids, err
 }
 
 func (d *DB) IsUserProfileComplete(telegramID int64) (bool, error) {
