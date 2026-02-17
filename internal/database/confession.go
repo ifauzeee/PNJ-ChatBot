@@ -138,3 +138,42 @@ func (d *DB) GetTotalConfessions(telegramID int64) (int, error) {
 	).Scan(&count)
 	return count, err
 }
+
+func (d *DB) CreateConfessionReply(confessionID, authorID int64, content string) error {
+	_, err := d.Exec(
+		`INSERT INTO confession_replies (confession_id, author_id, content, created_at) VALUES (?, ?, ?, ?)`,
+		confessionID, authorID, content, time.Now(),
+	)
+	if err == nil {
+		d.IncrementUserKarma(authorID, 2)
+	}
+	return err
+}
+
+func (d *DB) GetConfessionReplies(confessionID int64) ([]*models.ConfessionReply, error) {
+	rows, err := d.Query(
+		`SELECT id, confession_id, author_id, content, created_at 
+		 FROM confession_replies WHERE confession_id = ? ORDER BY created_at ASC`,
+		confessionID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var replies []*models.ConfessionReply
+	for rows.Next() {
+		r := &models.ConfessionReply{}
+		if err := rows.Scan(&r.ID, &r.ConfessionID, &r.AuthorID, &r.Content, &r.CreatedAt); err != nil {
+			return nil, err
+		}
+		replies = append(replies, r)
+	}
+	return replies, nil
+}
+
+func (d *DB) GetConfessionReplyCount(confessionID int64) (int, error) {
+	var count int
+	err := d.QueryRow(`SELECT COUNT(*) FROM confession_replies WHERE confession_id = ?`, confessionID).Scan(&count)
+	return count, err
+}

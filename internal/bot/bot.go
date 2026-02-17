@@ -175,6 +175,8 @@ func (b *Bot) Start() {
 		{Command: "confess", Description: "💬 Kirim confession anonim"},
 		{Command: "confessions", Description: "📋 Lihat confession terbaru"},
 		{Command: "react", Description: "❤️ Reaksi ke confession"},
+		{Command: "reply", Description: "Balas confession (contoh: /reply 1 Hallo!)"},
+		{Command: "view_replies", Description: "Lihat balasan confession (contoh: /view_replies 1)"},
 		{Command: "whisper", Description: "📢 Kirim whisper ke jurusan"},
 		{Command: "profile", Description: "👤 Lihat profil kamu"},
 		{Command: "stats", Description: "📊 Statistik kamu"},
@@ -255,6 +257,10 @@ func (b *Bot) handleCommand(msg *tgbotapi.Message) {
 			b.handleConfessions(msg)
 		case "react":
 			b.handleReact(msg)
+		case "reply":
+			b.handleReply(msg)
+		case "view_replies":
+			b.handleViewReplies(msg)
 		case "whisper":
 			b.handleWhisper(msg)
 		case "profile":

@@ -193,3 +193,11 @@ type Whisper struct {
 	SenderGender string    `json:"sender_gender"`
 	CreatedAt    time.Time `json:"created_at"`
 }
+
+type ConfessionReply struct {
+	ID           int64     `json:"id"`
+	ConfessionID int64     `json:"confession_id"`
+	AuthorID     int64     `json:"author_id"`
+	Content      string    `json:"content"`
+	CreatedAt    time.Time `json:"created_at"`
+}

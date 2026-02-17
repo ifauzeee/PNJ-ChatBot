@@ -150,6 +150,15 @@ func (d *DB) migrate() error {
 			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 			FOREIGN KEY (sender_id) REFERENCES users(telegram_id)
 		)`,
+		`CREATE TABLE IF NOT EXISTS confession_replies (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			confession_id INTEGER NOT NULL,
+			author_id INTEGER NOT NULL,
+			content TEXT NOT NULL,
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			FOREIGN KEY (confession_id) REFERENCES confessions(id),
+			FOREIGN KEY (author_id) REFERENCES users(telegram_id)
+		)`,
 
 		`CREATE INDEX IF NOT EXISTS idx_users_telegram_id ON users(telegram_id)`,
 		`CREATE INDEX IF NOT EXISTS idx_users_department ON users(department)`,

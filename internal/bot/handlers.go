@@ -486,22 +486,28 @@ func (b *Bot) handleConfessions(msg *tgbotapi.Message) {
 	for _, c := range confessions {
 		emoji := models.DepartmentEmoji(models.Department(c.Department))
 		counts, _ := b.confession.GetReactionCounts(c.ID)
+		replyCount, _ := b.db.GetConfessionReplyCount(c.ID)
 
 		reactionStr := ""
 		for r, count := range counts {
 			reactionStr += fmt.Sprintf("%s%d ", r, count)
 		}
 
+		replyStr := ""
+		if replyCount > 0 {
+			replyStr = fmt.Sprintf("💬 %d Replies", replyCount)
+		}
+
 		text := fmt.Sprintf(`💬 *#%d* | %s %s
 %s
-%s
+%s %s
 ─────────────────
-`, c.ID, emoji, c.Department, escapeMarkdown(c.Content), reactionStr)
+`, c.ID, emoji, c.Department, escapeMarkdown(c.Content), reactionStr, replyStr)
 
 		header += text
 	}
 
-	header += "\n_React ke confession: ketik_ /react <id> <emoji>"
+	header += "\n_React: ketik_ /react <id> <emoji>\n_Balas: ketik_ /reply <id> <pesan>\n_Lihat: ketik_ /view_replies <id>"
 
 	b.sendMessage(telegramID, header, nil)
 }
@@ -535,6 +541,85 @@ func (b *Bot) handleReact(msg *tgbotapi.Message) {
 	}
 
 	b.sendMessage(telegramID, fmt.Sprintf("✅ Berhasil menambahkan reaksi %s ke confession #%d", reaction, confessionID), nil)
+}
+
+func (b *Bot) handleReply(msg *tgbotapi.Message) {
+	telegramID := msg.From.ID
+	args := msg.CommandArguments()
+
+	if args == "" {
+		b.sendMessage(telegramID, "💡 Cara membalas: `/reply <id> <pesan>`\nContoh: `/reply 1 Semangat ya!`", nil)
+		return
+	}
+
+	parts := strings.SplitN(args, " ", 2)
+	if len(parts) < 2 {
+		b.sendMessage(telegramID, "⚠️ Format salah. Contoh: `/reply 1 Halo!`", nil)
+		return
+	}
+
+	confessionID, err := strconv.ParseInt(parts[0], 10, 64)
+	if err != nil {
+		b.sendMessage(telegramID, "⚠️ ID confession harus berupa angka.", nil)
+		return
+	}
+
+	content := parts[1]
+	err = b.db.CreateConfessionReply(confessionID, telegramID, content)
+	if err != nil {
+		b.sendMessage(telegramID, "❌ Gagal mengirim balasan.", nil)
+		return
+	}
+
+	confession, _ := b.db.GetConfession(confessionID)
+	if confession != nil && confession.AuthorID != telegramID {
+		b.db.IncrementUserKarma(confession.AuthorID, 1)
+	}
+
+	b.sendMessage(telegramID, fmt.Sprintf("✅ Berhasil membalas confession #%d", confessionID), nil)
+}
+
+func (b *Bot) handleViewReplies(msg *tgbotapi.Message) {
+	telegramID := msg.From.ID
+	args := msg.CommandArguments()
+
+	if args == "" {
+		b.sendMessage(telegramID, "💡 Cara melihat: `/view_replies <id>`", nil)
+		return
+	}
+
+	confessionID, err := strconv.ParseInt(args, 10, 64)
+	if err != nil {
+		b.sendMessage(telegramID, "⚠️ ID confession harus berupa angka.", nil)
+		return
+	}
+
+	confession, err := b.db.GetConfession(confessionID)
+	if err != nil || confession == nil {
+		b.sendMessage(telegramID, "❌ Confession tidak ditemukan.", nil)
+		return
+	}
+
+	replies, err := b.db.GetConfessionReplies(confessionID)
+	if err != nil {
+		b.sendMessage(telegramID, "❌ Gagal mengambil balasan.", nil)
+		return
+	}
+
+	if len(replies) == 0 {
+		b.sendMessage(telegramID, fmt.Sprintf("📋 Belum ada balasan untuk confession #%d.", confessionID), nil)
+		return
+	}
+
+	response := fmt.Sprintf("📋 *Balasan Confession #%d*\n", confessionID)
+	response += fmt.Sprintf("> %s\n", escapeMarkdown(confession.Content))
+	response += "━━━━━━━━━━━━━━━━━━━\n\n"
+
+	for i, r := range replies {
+		response += fmt.Sprintf("*%d.* %s\n\n", i+1, escapeMarkdown(r.Content))
+	}
+
+	b.sendMessage(telegramID, response, nil)
 }
 
 func (b *Bot) handleWhisper(msg *tgbotapi.Message) {
