@@ -45,7 +45,6 @@ func New(dbPath string) (*DB, error) {
 		return nil, fmt.Errorf("failed to run migrations: %w", err)
 	}
 
-	// Hotfix: Add preferred_gender column if not exists
 	d.Exec("ALTER TABLE chat_queue ADD COLUMN preferred_gender TEXT DEFAULT ''")
 
 	log.Println("✅ Database connected and migrated successfully")

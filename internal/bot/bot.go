@@ -138,10 +138,33 @@ func (b *Bot) startHealthServer() {
 	}
 }
 
+func (b *Bot) startQueueWorker() {
+	ticker := time.NewTicker(30 * time.Second)
+	go func() {
+		for range ticker.C {
+			updatedIDs, err := b.chat.ProcessQueueTimeout(60)
+			if err != nil {
+				log.Printf("⚠️ Queue worker error: %v", err)
+				continue
+			}
+
+			for _, telegramID := range updatedIDs {
+				msg := `⏳ *Belum menemukan partner...*
+
+Karena belum ada partner yang cocok dengan kriteria kamu, sekarang bot akan mencari partner secara *acak* agar lebih cepat.
+
+_Mohon tunggu sebentar ya..._`
+				b.sendMessage(telegramID, msg, nil)
+			}
+		}
+	}()
+}
+
 func (b *Bot) Start() {
 	log.Println("🚀 Starting PNJ Anonymous Bot...")
 
 	go b.startHealthServer()
+	b.startQueueWorker()
 
 	commands := []tgbotapi.BotCommand{
 		{Command: "start", Description: "🎭 Mulai bot / Menu utama"},

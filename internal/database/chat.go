@@ -164,3 +164,36 @@ func (d *DB) GetTotalChatSessions(telegramID int64) (int, error) {
 	).Scan(&count)
 	return count, err
 }
+
+func (d *DB) GetExpiredQueueItems(timeoutSeconds int) ([]models.ChatQueue, error) {
+	query := `SELECT telegram_id, preferred_dept, preferred_gender, joined_at 
+			  FROM chat_queue 
+			  WHERE (preferred_dept != '' OR preferred_gender != '')
+			  AND joined_at <= ?`
+
+	threshold := time.Now().Add(-time.Duration(timeoutSeconds) * time.Second)
+
+	rows, err := d.Query(query, threshold)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var items []models.ChatQueue
+	for rows.Next() {
+		var item models.ChatQueue
+		if err := rows.Scan(&item.TelegramID, &item.PreferredDept, &item.PreferredGender, &item.JoinedAt); err != nil {
+			return nil, err
+		}
+		items = append(items, item)
+	}
+	return items, nil
+}
+
+func (d *DB) ClearQueueFilters(telegramID int64) error {
+	_, err := d.Exec(
+		`UPDATE chat_queue SET preferred_dept = '', preferred_gender = '' WHERE telegram_id = ?`,
+		telegramID,
+	)
+	return err
+}

@@ -133,3 +133,22 @@ func (s *ChatService) CancelSearch(telegramID int64) error {
 	s.db.SetUserState(telegramID, models.StateNone, "")
 	return nil
 }
+
+func (s *ChatService) ProcessQueueTimeout(timeoutSeconds int) ([]int64, error) {
+	items, err := s.db.GetExpiredQueueItems(timeoutSeconds)
+	if err != nil {
+		return nil, err
+	}
+
+	var updatedIDs []int64
+	for _, item := range items {
+		if err := s.db.ClearQueueFilters(item.TelegramID); err != nil {
+			log.Printf("Error clearing filters for %d: %v", item.TelegramID, err)
+			continue
+		}
+		s.db.SetUserState(item.TelegramID, models.StateSearching, "")
+		updatedIDs = append(updatedIDs, item.TelegramID)
+	}
+
+	return updatedIDs, nil
+}

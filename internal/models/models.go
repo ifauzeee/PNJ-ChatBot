@@ -133,10 +133,11 @@ type ChatSession struct {
 }
 
 type ChatQueue struct {
-	ID            int64     `json:"id"`
-	TelegramID    int64     `json:"telegram_id"`
-	PreferredDept string    `json:"preferred_dept"`
-	JoinedAt      time.Time `json:"joined_at"`
+	ID              int64     `json:"id"`
+	TelegramID      int64     `json:"telegram_id"`
+	PreferredDept   string    `json:"preferred_dept"`
+	PreferredGender string    `json:"preferred_gender"`
+	JoinedAt        time.Time `json:"joined_at"`
 }
 
 type Confession struct {
