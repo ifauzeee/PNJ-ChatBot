@@ -23,12 +23,10 @@ services:
       - "log_checkpoints=off"
     environment:
       - POSTGRES_USER=pnjbot
-      - POSTGRES_PASSWORD=pnjpassword
+      - POSTGRES_PASSWORD=${DB_PASSWORD:?DB_PASSWORD is required}
       - POSTGRES_DB=pnj_anonymous
     volumes:
       - postgres-data:/var/lib/postgresql/data
-    ports:
-      - "5432:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U pnjbot -d pnj_anonymous"]
       interval: 10s
@@ -43,8 +41,6 @@ services:
     command: ["redis-server", "--loglevel", "warning"]
     volumes:
       - redis-data:/data
-    ports:
-      - "6379:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
@@ -79,7 +75,7 @@ services:
       - DB_HOST=postgres
       - DB_PORT=5432
       - DB_USER=pnjbot
-      - DB_PASSWORD=pnjpassword
+      - DB_PASSWORD=${DB_PASSWORD:?DB_PASSWORD is required}
       - DB_NAME=pnj_anonymous
       - REDIS_URL=redis:6379
       - TZ=Asia/Jakarta
@@ -113,7 +109,7 @@ services:
       - DB_HOST=postgres
       - DB_PORT=5432
       - DB_USER=pnjbot
-      - DB_PASSWORD=pnjpassword
+      - DB_PASSWORD=${DB_PASSWORD:?DB_PASSWORD is required}
       - DB_NAME=pnj_anonymous
       - TZ=Asia/Jakarta
       - APP_ENV=production

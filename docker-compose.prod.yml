@@ -33,12 +33,14 @@ services:
   watchtower:
     image: containrrr/watchtower:latest
     container_name: pnj-bot-watchtower
-    restart: unless-stopped
+    profiles:
+      - watchtower
+    restart: "no"
+    command:
+      - --run-once
+      - --cleanup
+      - --label-enable
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-    environment:
-      - WATCHTOWER_CLEANUP=true
-      - WATCHTOWER_POLL_INTERVAL=300
-      - WATCHTOWER_LABEL_ENABLE=true
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
