@@ -16,21 +16,20 @@ func (d *DB) AddToQueue(telegramID int64, preferredDept, preferredGender string,
 		Values(telegramID, preferredDept, preferredGender, preferredYear, time.Now()).
 		ToSql()
 
-	query = d.PrepareQuery(strings.Replace(query, "INSERT INTO", "INSERT OR REPLACE INTO", 1))
-	_, err := d.DB.Exec(query, args...)
+	_, err := d.Exec(strings.Replace(query, "INSERT INTO", "INSERT OR REPLACE INTO", 1), args...)
 	return err
 }
 
 func (d *DB) RemoveFromQueue(telegramID int64) error {
 	query, args, _ := d.Builder.Delete("chat_queue").Where("telegram_id = ?", telegramID).ToSql()
-	_, err := d.DB.Exec(query, args...)
+	_, err := d.Exec(query, args...)
 	return err
 }
 
 func (d *DB) IsInQueue(telegramID int64) (bool, error) {
 	var count int
 	query, args, _ := d.Builder.Select("COUNT(*)").From("chat_queue").Where("telegram_id = ?", telegramID).ToSql()
-	err := d.DB.Get(&count, query, args...)
+	err := d.Get(&count, query, args...)
 	return count > 0, err
 }
 
@@ -68,7 +67,7 @@ func (d *DB) FindMatch(telegramID int64, preferredDept, preferredGender string, 
 		return 0, err
 	}
 
-	err = d.DB.Get(&matchID, query, args...)
+	err = d.Get(&matchID, query, args...)
 	if err == sql.ErrNoRows {
 		return 0, nil
 	}
@@ -112,7 +111,7 @@ func (d *DB) StopChat(telegramID int64) (int64, error) {
 func (d *DB) GetQueueCount() (int, error) {
 	var count int
 	query, args, _ := d.Builder.Select("COUNT(*)").From("chat_queue").ToSql()
-	err := d.DB.Get(&count, query, args...)
+	err := d.Get(&count, query, args...)
 	return count, err
 }
 
@@ -152,7 +151,7 @@ func (d *DB) GetActiveSession(telegramID int64) (*models.ChatSession, error) {
 		return nil, err
 	}
 
-	err = d.DB.Get(session, query, args...)
+	err = d.Get(session, query, args...)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -168,7 +167,7 @@ func (d *DB) EndChatSession(sessionID int64) error {
 		Set("is_active", false).
 		Set("ended_at", time.Now()).
 		Where("id = ?", sessionID).ToSql()
-	_, err := d.DB.Exec(query, args...)
+	_, err := d.Exec(query, args...)
 	return err
 }
 
@@ -177,7 +176,7 @@ func (d *DB) EndAllActiveSessions(telegramID int64) error {
 		Set("is_active", false).
 		Set("ended_at", time.Now()).
 		Where("(user1_id = ? OR user2_id = ?) AND is_active = TRUE", telegramID, telegramID).ToSql()
-	_, err := d.DB.Exec(query, args...)
+	_, err := d.Exec(query, args...)
 	return err
 }
 
@@ -200,7 +199,7 @@ func (d *DB) GetTotalChatSessions(telegramID int64) (int, error) {
 	var count int
 	query, args, _ := d.Builder.Select("COUNT(*)").From("chat_sessions").
 		Where("user1_id = ? OR user2_id = ?", telegramID, telegramID).ToSql()
-	err := d.DB.Get(&count, query, args...)
+	err := d.Get(&count, query, args...)
 	return count, err
 }
 
@@ -217,7 +216,7 @@ func (d *DB) GetExpiredQueueItems(timeoutSeconds int) ([]models.ChatQueue, error
 	}
 
 	var items []models.ChatQueue
-	err = d.DB.Select(&items, query, args...)
+	err = d.Select(&items, query, args...)
 	return items, err
 }
 
@@ -228,6 +227,6 @@ func (d *DB) ClearQueueFilters(telegramID int64) error {
 		Set("preferred_year", 0).
 		Where("telegram_id = ?", telegramID).ToSql()
 
-	_, err := d.DB.Exec(query, args...)
+	_, err := d.Exec(query, args...)
 	return err
 }

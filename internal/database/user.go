@@ -20,9 +20,7 @@ func (d *DB) CreateUser(telegramID int64) (*models.User, error) {
 		return nil, fmt.Errorf("failed to build query: %w", err)
 	}
 
-	query = d.PrepareQuery(strings.Replace(query, "INSERT INTO", "INSERT OR IGNORE INTO", 1))
-
-	_, err = d.DB.Exec(query, args...)
+	_, err = d.Exec(strings.Replace(query, "INSERT INTO", "INSERT OR IGNORE INTO", 1), args...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create user: %w", err)
 	}
@@ -41,7 +39,7 @@ func (d *DB) GetUser(telegramID int64) (*models.User, error) {
 		return nil, fmt.Errorf("failed to build query: %w", err)
 	}
 
-	err = d.DB.Get(user, query, args...)
+	err = d.Get(user, query, args...)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -60,7 +58,7 @@ func (d *DB) UpdateUserEmail(telegramID int64, email string) error {
 	if err != nil {
 		return err
 	}
-	_, err = d.DB.Exec(query, args...)
+	_, err = d.Exec(query, args...)
 	return err
 }
 
@@ -73,7 +71,7 @@ func (d *DB) UpdateUserVerified(telegramID int64, verified bool) error {
 	if err != nil {
 		return err
 	}
-	_, err = d.DB.Exec(query, args...)
+	_, err = d.Exec(query, args...)
 	return err
 }
 
@@ -86,7 +84,7 @@ func (d *DB) UpdateUserGender(telegramID int64, gender string) error {
 	if err != nil {
 		return err
 	}
-	_, err = d.DB.Exec(query, args...)
+	_, err = d.Exec(query, args...)
 	return err
 }
 
@@ -99,7 +97,7 @@ func (d *DB) UpdateUserDepartment(telegramID int64, dept string) error {
 	if err != nil {
 		return err
 	}
-	_, err = d.DB.Exec(query, args...)
+	_, err = d.Exec(query, args...)
 	return err
 }
 
@@ -112,7 +110,7 @@ func (d *DB) UpdateUserYear(telegramID int64, year int) error {
 	if err != nil {
 		return err
 	}
-	_, err = d.DB.Exec(query, args...)
+	_, err = d.Exec(query, args...)
 	return err
 }
 
@@ -125,7 +123,7 @@ func (d *DB) UpdateUserDisplayName(telegramID int64, name string) error {
 	if err != nil {
 		return err
 	}
-	_, err = d.DB.Exec(query, args...)
+	_, err = d.Exec(query, args...)
 	return err
 }
 
@@ -138,7 +136,7 @@ func (d *DB) IncrementUserKarma(telegramID int64, amount int) error {
 	if err != nil {
 		return err
 	}
-	_, err = d.DB.Exec(query, args...)
+	_, err = d.Exec(query, args...)
 	return err
 }
 
@@ -151,7 +149,7 @@ func (d *DB) UpdateUserBanned(telegramID int64, banned bool) error {
 	if err != nil {
 		return err
 	}
-	_, err = d.DB.Exec(query, args...)
+	_, err = d.Exec(query, args...)
 	return err
 }
 
@@ -164,14 +162,14 @@ func (d *DB) IncrementReportCount(telegramID int64) (int, error) {
 	if err != nil {
 		return 0, err
 	}
-	_, err = d.DB.Exec(query, args...)
+	_, err = d.Exec(query, args...)
 	if err != nil {
 		return 0, err
 	}
 
 	var count int
 	query, args, _ = d.Builder.Select("report_count").From("users").Where("telegram_id = ?", telegramID).ToSql()
-	err = d.DB.Get(&count, query, args...)
+	err = d.Get(&count, query, args...)
 	return count, err
 }
 
@@ -184,7 +182,7 @@ func (d *DB) IncrementTotalChats(telegramID int64) error {
 	if err != nil {
 		return err
 	}
-	_, err = d.DB.Exec(query, args...)
+	_, err = d.Exec(query, args...)
 	return err
 }
 
@@ -198,7 +196,7 @@ func (d *DB) SetUserState(telegramID int64, state models.UserState, data string)
 	if err != nil {
 		return err
 	}
-	_, err = d.DB.Exec(query, args...)
+	_, err = d.Exec(query, args...)
 	return err
 }
 
@@ -213,7 +211,7 @@ func (d *DB) GetUserState(telegramID int64) (models.UserState, string, error) {
 		return models.StateNone, "", err
 	}
 
-	err = d.DB.Get(&res, query, args...)
+	err = d.Get(&res, query, args...)
 	if err == sql.ErrNoRows {
 		return models.StateNone, "", nil
 	}
@@ -224,7 +222,7 @@ func (d *DB) GetOnlineUserCount() (int, error) {
 	var count int
 	query, args, _ := d.Builder.Select("COUNT(*)").From("users").
 		Where(squirrel.Eq{"is_verified": true, "is_banned": false}).ToSql()
-	err := d.DB.Get(&count, query, args...)
+	err := d.Get(&count, query, args...)
 	return count, err
 }
 
@@ -232,7 +230,7 @@ func (d *DB) GetDepartmentUserCount(dept string) (int, error) {
 	var count int
 	query, args, _ := d.Builder.Select("COUNT(*)").From("users").
 		Where(squirrel.Eq{"department": dept, "is_verified": true, "is_banned": false}).ToSql()
-	err := d.DB.Get(&count, query, args...)
+	err := d.Get(&count, query, args...)
 	return count, err
 }
 
@@ -245,7 +243,7 @@ func (d *DB) GetUsersByDepartment(dept string, excludeTelegramID int64) ([]int64
 		return nil, err
 	}
 
-	err = d.DB.Select(&ids, query, args...)
+	err = d.Select(&ids, query, args...)
 	return ids, err
 }
 
