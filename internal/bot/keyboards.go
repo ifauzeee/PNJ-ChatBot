@@ -268,3 +268,11 @@ func PollVoteKeyboard(pollID int64, options []*models.PollOption) tgbotapi.Inlin
 	}
 	return tgbotapi.NewInlineKeyboardMarkup(rows...)
 }
+
+func LegalAgreementKeyboard() tgbotapi.InlineKeyboardMarkup {
+	return tgbotapi.NewInlineKeyboardMarkup(
+		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData("✅ Saya Setuju", "legal:agree"),
+		),
+	)
+}

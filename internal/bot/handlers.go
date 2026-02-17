@@ -44,7 +44,7 @@ Ketik /regist dan ikuti proses verifikasi email PNJ kamu.`, html.EscapeString(ms
 	}
 
 	if string(user.Gender) == "" {
-		b.sendMessage(telegramID, "👤 *Pilih Gender Kamu:*", &tgbotapi.InlineKeyboardMarkup{})
+		b.sendMessage(telegramID, "👤 *Pilih Gender Kamu:*", nil)
 		kb := GenderKeyboard()
 		b.sendMessage(telegramID, "👇 Silakan pilih:", &kb)
 		b.db.SetUserState(telegramID, models.StateAwaitingGender, "")
@@ -82,16 +82,36 @@ func (b *Bot) handleRegist(msg *tgbotapi.Message) {
 		return
 	}
 
+	aboutText := `<b>⚖️ Informasi Hukum & Disclaimer</b>
+
+━━━━━━━━━━━━━━━━━━━
+<b>Disclaimer Afiliasi:</b>
+Platform ini adalah layanan independen yang dikembangkan oleh sekelompok mahasiswa untuk tujuan sosial dan komunikasi antar mahasiswa. PNJ Anonymous Bot <b>TIDAK MEMILIKI HUBUNGAN AFILIASI</b> dengan manajemen Politeknik Negeri Jakarta (PNJ). Segala bentuk logo atau nama "PNJ" digunakan semata-mata untuk menunjukkan target demografis pengguna (mahasiswa PNJ).
+
+<b>Tanggung Jawab Konten:</b>
+Seluruh pesan, confession, dan polling yang dikirimkan melalui bot ini adalah tanggung jawab sepenuhnya dari <b>PENGIRIM (USER)</b>. Pengembang bot tidak bertanggung jawab atas segala bentuk kerugian, pencemaran nama baik, atau masalah hukum yang timbul akibat penyalahgunaan layanan ini.
+
+<b>Privasi & Data:</b>
+Kami hanya menyimpan alamat email PNJ untuk memastikan sistem hanya digunakan oleh mahasiswa aktif. Kami berkomitmen untuk menjaga kerahasiaan identitas anonim Anda dan tidak akan pernah membocorkan identitas pengirim pesan kecuali diminta secara resmi oleh pihak berwenang melalui jalur hukum yang berlaku di Indonesia.
+
+<b>Persetujuan:</b>
+Dengan menggunakan bot ini, Anda dianggap telah membaca dan menyetujui seluruh ketentuan di atas.
+
+<i>Stay Anonymous, Stay Responsible.</i>`
+
+	kb := LegalAgreementKeyboard()
+	b.sendMessageHTML(telegramID, aboutText, &kb)
+}
+
+func (b *Bot) startEmailVerif(telegramID int64) {
 	registText := `🔐 <b>Verifikasi Email</b>
 ━━━━━━━━━━━━━━━━━━━
 Untuk menggunakan bot ini, kamu perlu verifikasi email PNJ kamu.
 
 📧 <b>Ketik email PNJ kamu:</b>
-Contoh: <i>nama@mhsw.pnj.ac.id</i>
+Contoh: <i>nama@mhsw.pnj.ac.id / nama@stu.pnj.ac.id</i>
 
-Domain yang diterima:
-• @mhsw.pnj.ac.id (Mahasiswa)
-• @stu.pnj.ac.id (Dosen/Staff)`
+⚠️ Pastikan email kamu benar dan aktif.`
 
 	b.db.SetUserState(telegramID, models.StateAwaitingEmail, "")
 	b.sendMessageHTML(telegramID, registText, nil)

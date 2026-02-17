@@ -45,6 +45,8 @@ func (b *Bot) handleCallback(callback *tgbotapi.CallbackQuery) {
 		b.handleReactionCallback(telegramID, value, callback)
 	case "whisper":
 		b.handleWhisperCallback(telegramID, value, callback)
+	case "legal":
+		b.handleLegalCallback(telegramID, value, callback)
 	}
 }
 
@@ -408,4 +410,13 @@ func (b *Bot) handleWhisperCallback(telegramID int64, dept string, callback *tgb
 Tulis pesan anonim kamu untuk mahasiswa %s:
 
 _Ketik /cancel untuk membatalkan_`, emoji, dept, dept), nil)
+}
+
+func (b *Bot) handleLegalCallback(telegramID int64, value string, callback *tgbotapi.CallbackQuery) {
+	if value == "agree" {
+		deleteMsg := tgbotapi.NewDeleteMessage(telegramID, callback.Message.MessageID)
+		b.api.Send(deleteMsg)
+
+		b.startEmailVerif(telegramID)
+	}
 }
