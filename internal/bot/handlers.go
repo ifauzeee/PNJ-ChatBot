@@ -722,10 +722,24 @@ func (b *Bot) handleReportInput(msg *tgbotapi.Message) {
 		sessionID = session.ID
 	}
 
-	err := b.profile.ReportUser(telegramID, reportedID, msg.Text, sessionID)
+	newCount, err := b.profile.ReportUser(telegramID, reportedID, msg.Text, sessionID)
 	if err != nil {
 		b.sendMessage(telegramID, fmt.Sprintf("⚠️ %s", err.Error()), nil)
 		return
+	}
+
+	if newCount > 0 && newCount < b.cfg.AutoBanReportCount {
+		warningMsg := fmt.Sprintf(`⚠️ *PERINGATAN MODERASI*
+
+Akun kamu baru saja dilaporkan karena perilaku atau pesan yang tidak pantas.
+
+📊 Status Laporan: *%d/%d*
+
+Mohon patuhi aturan komunitas agar akun kamu tidak diblokir secara otomatis oleh sistem.`, newCount, b.cfg.AutoBanReportCount)
+
+		b.sendMessage(reportedID, warningMsg, nil)
+	} else if newCount >= b.cfg.AutoBanReportCount {
+		b.sendMessage(reportedID, "🚫 *Akun kamu telah diblokir otomatis oleh sistem karena telah mencapai batas laporan (3/3).* Kamu tidak bisa lagi menggunakan bot ini.", nil)
 	}
 
 	b.db.SetUserState(telegramID, models.StateNone, "")

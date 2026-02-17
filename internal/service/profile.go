@@ -82,30 +82,30 @@ func (s *ProfileService) UpdateDepartment(telegramID int64, dept string) error {
 	return s.db.UpdateUserDepartment(telegramID, dept)
 }
 
-func (s *ProfileService) ReportUser(reporterID, reportedID int64, reason string, chatSessionID int64) error {
+func (s *ProfileService) ReportUser(reporterID, reportedID int64, reason string, chatSessionID int64) (int, error) {
 
 	count, err := s.db.GetUserReportCount(reporterID, time.Now().Add(-24*time.Hour))
 	if err != nil {
-		return err
+		return 0, err
 	}
 	if count >= s.cfg.MaxReportsPerDay {
-		return fmt.Errorf("kamu sudah mencapai batas laporan per hari")
+		return 0, fmt.Errorf("kamu sudah mencapai batas laporan per hari")
 	}
 
 	if err := s.db.CreateReport(reporterID, reportedID, reason, chatSessionID); err != nil {
-		return err
+		return 0, err
 	}
 
 	newCount, err := s.db.IncrementReportCount(reportedID)
 	if err != nil {
-		return err
+		return 0, err
 	}
 
 	if newCount >= s.cfg.AutoBanReportCount {
 		s.db.UpdateUserBanned(reportedID, true)
 	}
 
-	return nil
+	return newCount, nil
 }
 
 func (s *ProfileService) BlockUser(userID, blockedID int64) error {
