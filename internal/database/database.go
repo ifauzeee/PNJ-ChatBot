@@ -191,6 +191,11 @@ func (d *DB) migrate() error {
 			UNIQUE(telegram_id, achievement_key),
 			FOREIGN KEY (telegram_id) REFERENCES users(telegram_id)
 		)`,
+		`CREATE TABLE IF NOT EXISTS cs_messages (
+			admin_message_id INTEGER PRIMARY KEY,
+			user_id INTEGER NOT NULL,
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+		)`,
 
 		`CREATE INDEX IF NOT EXISTS idx_users_telegram_id ON users(telegram_id)`,
 		`CREATE INDEX IF NOT EXISTS idx_users_department ON users(department)`,

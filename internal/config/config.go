@@ -9,8 +9,9 @@ import (
 )
 
 type Config struct {
-	BotToken string
-	BotDebug bool
+	BotToken   string
+	CSBotToken string
+	BotDebug   bool
 
 	SMTPHost     string
 	SMTPPort     int
@@ -40,6 +41,7 @@ func Load() *Config {
 
 	cfg := &Config{
 		BotToken:              getEnv("BOT_TOKEN", ""),
+		CSBotToken:            getEnv("CS_BOT_TOKEN", ""),
 		BotDebug:              getEnvBool("BOT_DEBUG", false),
 		SMTPHost:              getEnv("SMTP_HOST", "smtp.gmail.com"),
 		SMTPPort:              getEnvInt("SMTP_PORT", 587),

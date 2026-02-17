@@ -31,10 +31,16 @@ COPY . .
 #   CGO_ENABLED=0       → Static binary (no libc dependency)
 #   GOARCH=amd64        → Target architecture
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
-    -ldflags="-s -w -X main.version=1.0.0 -X main.buildTime=$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+    -ldflags="-s -w -X main.version=1.0.0" \
     -trimpath \
     -o /build/pnj-bot \
     ./cmd/bot/
+
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
+    -ldflags="-s -w" \
+    -trimpath \
+    -o /build/pnj-csbot \
+    ./cmd/csbot/
 
 # ────────────────────────────────────────────────────────────
 # Stage 2: Runtime (Distroless-like minimal image)
@@ -71,6 +77,7 @@ RUN mkdir -p /app/data && chown -R pnjbot:pnjbot /app/data
 
 # Copy binary from builder
 COPY --from=builder /build/pnj-bot /app/pnj-bot
+COPY --from=builder /build/pnj-csbot /app/pnj-csbot
 
 # Copy timezone data from builder
 COPY --from=builder /usr/share/zoneinfo /usr/share/zoneinfo
@@ -79,7 +86,8 @@ COPY --from=builder /usr/share/zoneinfo /usr/share/zoneinfo
 COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 
 # Set ownership
-RUN chown pnjbot:pnjbot /app/pnj-bot && chmod +x /app/pnj-bot
+RUN chown pnjbot:pnjbot /app/pnj-bot /app/pnj-csbot && \
+    chmod +x /app/pnj-bot /app/pnj-csbot
 
 # Switch to non-root user
 USER pnjbot
