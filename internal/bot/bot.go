@@ -145,6 +145,7 @@ func (b *Bot) Start() {
 
 	commands := []tgbotapi.BotCommand{
 		{Command: "start", Description: "🎭 Mulai bot / Menu utama"},
+		{Command: "regist", Description: "📝 Registrasi akun baru"},
 		{Command: "search", Description: "🔍 Cari partner chat anonim"},
 		{Command: "next", Description: "⏭️ Skip ke partner berikutnya"},
 		{Command: "stop", Description: "🛑 Hentikan chat saat ini"},
@@ -200,6 +201,8 @@ func (b *Bot) handleCommand(msg *tgbotapi.Message) {
 	switch msg.Command() {
 	case "start":
 		b.handleStart(msg)
+	case "regist":
+		b.handleRegist(msg)
 	case "help":
 		b.handleHelp(msg)
 	case "cancel":
@@ -284,7 +287,7 @@ func (b *Bot) requireVerification(msg *tgbotapi.Message) bool {
 	}
 
 	if !user.IsVerified {
-		b.sendMessage(telegramID, "⚠️ *Email belum diverifikasi!*\n\nKetik /start dan ikuti proses verifikasi email PNJ kamu.", nil)
+		b.sendMessage(telegramID, "⚠️ *Email belum diverifikasi!*\n\nKetik /regist dan ikuti proses verifikasi email PNJ kamu.", nil)
 		return false
 	}
 

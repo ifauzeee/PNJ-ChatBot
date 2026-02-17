@@ -25,28 +25,10 @@ Hai %s! 👋
 
 Bot ini adalah platform anonim khusus untuk *mahasiswa Politeknik Negeri Jakarta* 🏛️
 
-━━━━━━━━━━━━━━━━━━━
-📌 *Fitur Utama:*
-━━━━━━━━━━━━━━━━━━━
-🔍 Chat anonim dengan mahasiswa PNJ lain
-💬 Kirim confession tanpa identitas
-📢 Whisper ke jurusan tertentu
-⏭️ Skip dan cari partner baru
-📊 Lihat statistik interaksi kamu
+⚠️ *Email belum diverifikasi!*
 
-━━━━━━━━━━━━━━━━━━━
-🔐 *Verifikasi Email*
-━━━━━━━━━━━━━━━━━━━
-Untuk menggunakan bot ini, kamu perlu verifikasi email PNJ kamu.
+Ketik /regist dan ikuti proses verifikasi email PNJ kamu.`, msg.From.FirstName)
 
-📧 *Ketik email PNJ kamu:*
-Contoh: _nama@mhsw.pnj.ac.id_
-
-Domain yang diterima:
-• @mhsw.pnj.ac.id (Mahasiswa)
-• @pnj.ac.id (Dosen/Staff)`, msg.From.FirstName)
-
-		b.db.SetUserState(telegramID, models.StateAwaitingEmail, "")
 		b.sendMessage(telegramID, welcomeText, nil)
 		return
 	}
@@ -67,6 +49,36 @@ Domain yang diterima:
 	}
 
 	b.showMainMenu(telegramID, user)
+	b.showMainMenu(telegramID, user)
+}
+
+func (b *Bot) handleRegist(msg *tgbotapi.Message) {
+	telegramID := msg.From.ID
+
+	user, err := b.auth.RegisterUser(telegramID)
+	if err != nil {
+		b.sendMessage(telegramID, "❌ Terjadi kesalahan. Coba lagi nanti.", nil)
+		return
+	}
+
+	if user.IsVerified {
+		b.sendMessage(telegramID, "✅ Kamu sudah terverifikasi!", nil)
+		return
+	}
+
+	registText := `🔐 *Verifikasi Email*
+━━━━━━━━━━━━━━━━━━━
+Untuk menggunakan bot ini, kamu perlu verifikasi email PNJ kamu.
+
+📧 *Ketik email PNJ kamu:*
+Contoh: _nama@mhsw.pnj.ac.id_
+
+Domain yang diterima:
+• @mhsw.pnj.ac.id (Mahasiswa)
+• @pnj.ac.id (Dosen/Staff)`
+
+	b.db.SetUserState(telegramID, models.StateAwaitingEmail, "")
+	b.sendMessage(telegramID, registText, nil)
 }
 
 func (b *Bot) showMainMenu(telegramID int64, user *models.User) {
@@ -691,7 +703,7 @@ func (b *Bot) handleOTPInput(msg *tgbotapi.Message) {
 	}
 
 	if !valid {
-		b.sendMessage(telegramID, "❌ *Kode OTP salah atau sudah kedaluwarsa.*\n\n🔄 Gunakan /start untuk mengirim ulang kode.", nil)
+		b.sendMessage(telegramID, "❌ *Kode OTP salah atau sudah kedaluwarsa.*\n\n🔄 Gunakan /regist untuk mengirim ulang kode.", nil)
 		return
 	}
 
