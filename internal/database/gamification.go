@@ -101,7 +101,7 @@ func (d *DB) GetLeaderboard(limit int) ([]models.User, error) {
 		From("users").
 		Where("is_banned = FALSE AND is_verified = TRUE").
 		OrderBy("points DESC", "level DESC").
-		Limit(uint64(limit))
+		Limit(uint64(limit)) // #nosec G115
 
 	err := d.SelectBuilder(&users, builder)
 	return users, err

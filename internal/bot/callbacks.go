@@ -211,7 +211,7 @@ func (b *Bot) handleChatActionCallback(telegramID int64, action string, _ *tgbot
 func (b *Bot) handleMenuCallback(telegramID int64, action string, callback *tgbotapi.CallbackQuery) {
 
 	deleteMsg := tgbotapi.NewDeleteMessage(telegramID, callback.Message.MessageID)
-	b.api.Send(deleteMsg)
+	_, _ = b.api.Send(deleteMsg)
 
 	switch action {
 	case "main":

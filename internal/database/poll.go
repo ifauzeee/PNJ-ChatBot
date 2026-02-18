@@ -82,7 +82,7 @@ func (d *DB) GetPoll(pollID int64) (*models.Poll, error) {
 
 func (d *DB) GetLatestPolls(limit int) ([]*models.Poll, error) {
 	builder := d.Builder.Select("id", "author_id", "question", "created_at").
-		From("polls").OrderBy("created_at DESC").Limit(uint64(limit))
+		From("polls").OrderBy("created_at DESC").Limit(uint64(limit)) // #nosec G115
 
 	var polls []*models.Poll
 	err := d.SelectBuilder(&polls, builder)

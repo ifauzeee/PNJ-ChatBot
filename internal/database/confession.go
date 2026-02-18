@@ -47,7 +47,7 @@ func (d *DB) GetConfession(id int64) (*models.Confession, error) {
 
 func (d *DB) GetLatestConfessions(limit int) ([]*models.Confession, error) {
 	builder := d.Builder.Select("id", "author_id", "content", "department", "like_count", "created_at").
-		From("confessions").OrderBy("created_at DESC").Limit(uint64(limit))
+		From("confessions").OrderBy("created_at DESC").Limit(uint64(limit)) // #nosec G115
 
 	var confessions []*models.Confession
 	err := d.SelectBuilder(&confessions, builder)
