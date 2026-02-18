@@ -1,31 +1,77 @@
-.PHONY: build run clean tidy docker docker-prod docker-stop docker-logs docker-status docker-clean docker-backup
+.PHONY: build run clean tidy docker docker-prod docker-stop docker-logs docker-status docker-clean docker-backup lint test-coverage help security
+
+# Default target
+all: help
+
+# ── Help ──────────────────────────────────────────────────
+help:
+	@echo "🎭 PNJ Anonymous Bot - Development Tools"
+	@echo ""
+	@echo "Usage: make [target]"
+	@echo ""
+	@echo "Local Development:"
+	@echo "  build           Build bot binaries"
+	@echo "  run             Run bot locally"
+	@echo "  tidy            Clean up go.mod"
+	@echo "  lint            Run golangci-lint"
+	@echo "  security        Run gosec security scan"
+	@echo "  test            Run all unit tests"
+	@echo "  test-coverage   Run tests and show coverage"
+	@echo ""
+	@echo "Docker Operations:"
+	@echo "  docker          Build & start (Dev)"
+	@echo "  docker-prod     Build & start (Prod)"
+	@echo "  docker-stop     Stop all containers"
+	@echo "  docker-logs     View live logs"
+	@echo "  docker-status   Check health & status"
+	@echo "  docker-clean    Reset environment"
+	@echo ""
 
 # ── Local Development ─────────────────────────────────────
 
 # Build the bot binary
 build:
+	@echo "🏗️  Building binaries..."
+	@mkdir -p bin
 	go build -o bin/pnj-bot.exe ./cmd/bot/
+	go build -o bin/pnj-csbot.exe ./cmd/csbot/
 
 # Run the bot locally
 run:
 	go run ./cmd/bot/
 
+# Linting
+lint:
+	@echo "🔍 Linting code..."
+	golangci-lint run ./...
+
+# Security Scan
+security:
+	@echo "🛡️  Running security scan..."
+	gosec ./...
+
+# Testing
+test:
+	@echo "🧪 Running tests..."
+	go test -v ./...
+
+# Test Coverage
+test-coverage:
+	@echo "📊 Running tests with coverage..."
+	go test -coverprofile=coverage.out ./...
+	go tool cover -html=coverage.out -o coverage.html
+	@echo "✅ Coverage report generated: coverage.html"
+
 # Clean build artifacts
 clean:
+	@echo "🧹 Cleaning up..."
 	rm -rf bin/
-	rm -rf data/
+	rm -rf data/*.db
+	rm -f coverage.out coverage.html
 
 # Tidy dependencies
 tidy:
 	go mod tidy
-
-# Download dependencies
-deps:
-	go mod download
-
-# Build and run locally
-dev: tidy build
-	./bin/pnj-bot.exe
 
 # ── Docker ────────────────────────────────────────────────
 
