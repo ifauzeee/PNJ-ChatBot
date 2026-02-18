@@ -127,8 +127,8 @@ func TestChatServiceFiltering(t *testing.T) {
 	createUserForTest(t, db, 5002, string(models.GenderFemale), string(models.DeptTeknikMesin), 2022)
 	createUserForTest(t, db, 5003, string(models.GenderMale), string(models.DeptTeknikInformatika), 2021)
 
-	chatSvc.SearchPartner(5002, "NON_EXISTENT", "", 0)
-	chatSvc.SearchPartner(5003, "NON_EXISTENT", "", 0)
+	_, _ = chatSvc.SearchPartner(5002, "NON_EXISTENT", "", 0)
+	_, _ = chatSvc.SearchPartner(5003, "NON_EXISTENT", "", 0)
 
 	matchID, err := chatSvc.SearchPartner(5001, string(models.DeptTeknikInformatika), "", 0)
 	if err != nil {
@@ -138,13 +138,13 @@ func TestChatServiceFiltering(t *testing.T) {
 		t.Errorf("Expected match with User C (5003) due to TIK filter, got %d", matchID)
 	}
 
-	chatSvc.StopChat(5001)
-	db.SetUserState(5001, models.StateNone, "")
-	db.SetUserState(5002, models.StateNone, "")
-	db.SetUserState(5003, models.StateNone, "")
+	_, _ = chatSvc.StopChat(5001)
+	_ = db.SetUserState(5001, models.StateNone, "")
+	_ = db.SetUserState(5002, models.StateNone, "")
+	_ = db.SetUserState(5003, models.StateNone, "")
 
-	chatSvc.SearchPartner(5002, "NON_EXISTENT", "", 0)
-	chatSvc.SearchPartner(5003, "NON_EXISTENT", "", 0)
+	_, _ = chatSvc.SearchPartner(5002, "NON_EXISTENT", "", 0)
+	_, _ = chatSvc.SearchPartner(5003, "NON_EXISTENT", "", 0)
 	matchID, _ = chatSvc.SearchPartner(5001, "", "", 2022)
 	if matchID != 5002 {
 		t.Errorf("Expected match with User B (5002) due to Year filter, got %d", matchID)

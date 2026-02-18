@@ -136,7 +136,9 @@ func (s *Sender) SendOTP(to, code string) error {
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		var errorRes map[string]interface{}
-		json.NewDecoder(resp.Body).Decode(&errorRes)
+		if err := json.NewDecoder(resp.Body).Decode(&errorRes); err != nil {
+			return fmt.Errorf("brevo api error (status %d): (failed to decode error body)", resp.StatusCode)
+		}
 		return fmt.Errorf("brevo api error (status %d): %v", resp.StatusCode, errorRes)
 	}
 

@@ -69,8 +69,8 @@ func TestAuthServiceInvalidOTP(t *testing.T) {
 	authSvc := NewAuthService(db, &MockEmailSender{}, cfg)
 
 	userID := int64(9002)
-	authSvc.RegisterUser(userID)
-	authSvc.InitiateVerification(userID, "wrong@mhsw.pnj.ac.id")
+	_, _ = authSvc.RegisterUser(userID)
+	_ = authSvc.InitiateVerification(userID, "wrong@mhsw.pnj.ac.id")
 
 	verified, err := authSvc.VerifyOTP(userID, "000000")
 	if err != nil {

@@ -528,11 +528,11 @@ func (b *Bot) requireVerification(msg *tgbotapi.Message) bool {
 	if b.cfg.MaintenanceAccountID != 0 && telegramID == b.cfg.MaintenanceAccountID {
 		user, _ := b.db.GetUser(telegramID)
 		if user == nil {
-			b.db.CreateUser(telegramID)
-			b.db.UpdateUserDisplayName(telegramID, "🛠️ Maintenance Account")
-			b.db.UpdateUserVerified(telegramID, true)
-			b.db.UpdateUserGender(telegramID, "Maintenance")
-			b.db.UpdateUserDepartment(telegramID, "System")
+			_, _ = b.db.CreateUser(telegramID)
+			_ = b.db.UpdateUserDisplayName(telegramID, "🛠️ Maintenance Account")
+			_ = b.db.UpdateUserVerified(telegramID, true)
+			_ = b.db.UpdateUserGender(telegramID, "Maintenance")
+			_ = b.db.UpdateUserDepartment(telegramID, "System")
 		}
 		return true
 	}

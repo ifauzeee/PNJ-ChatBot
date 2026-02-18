@@ -47,7 +47,7 @@ func (s *EvidenceService) LogMessage(sessionID int64, senderID int64, content st
 	pipe.RPush(s.ctx, key, raw)
 	pipe.LTrim(s.ctx, key, -20, -1)
 	pipe.Expire(s.ctx, key, 24*time.Hour)
-	pipe.Exec(s.ctx)
+	_, _ = pipe.Exec(s.ctx)
 }
 
 func (s *EvidenceService) GetEvidence(sessionID int64) (string, error) {

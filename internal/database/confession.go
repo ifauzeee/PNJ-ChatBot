@@ -86,7 +86,7 @@ func (d *DB) AddConfessionReaction(confessionID, telegramID int64, reaction stri
 	authorQuery := d.Builder.Select("author_id").From("confessions").Where("id = ?", confessionID)
 	err = d.GetBuilder(&authorID, authorQuery)
 	if err == nil && authorID != telegramID {
-		d.IncrementUserKarma(authorID, 1)
+		_ = d.IncrementUserKarma(authorID, 1)
 	}
 
 	return err
@@ -145,7 +145,7 @@ func (d *DB) CreateConfessionReply(confessionID, authorID int64, content string)
 
 	_, err := d.ExecBuilder(builder)
 	if err == nil {
-		d.IncrementUserKarma(authorID, 2)
+		_ = d.IncrementUserKarma(authorID, 2)
 	}
 	return err
 }

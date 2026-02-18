@@ -31,7 +31,7 @@ func (b *Bot) handleCallback(callback *tgbotapi.CallbackQuery) {
 
 func (b *Bot) handleGenderCallback(telegramID int64, gender string, callback *tgbotapi.CallbackQuery) {
 	deleteMsg := tgbotapi.NewDeleteMessage(telegramID, callback.Message.MessageID)
-	b.api.Send(deleteMsg)
+	_, _ = b.api.Send(deleteMsg)
 
 	_, stateData, _ := b.db.GetUserState(telegramID)
 	if stateData == "edit" {
@@ -39,7 +39,7 @@ func (b *Bot) handleGenderCallback(telegramID int64, gender string, callback *tg
 			b.sendMessage(telegramID, fmt.Sprintf("⚠️ %s", err.Error()), nil)
 			return
 		}
-		b.db.SetUserState(telegramID, models.StateNone, "")
+		_ = b.db.SetUserState(telegramID, models.StateNone, "")
 		b.sendMessage(telegramID, "✅ Profil berhasil diperbarui!", nil)
 		return
 	}
@@ -58,7 +58,7 @@ func (b *Bot) handleGenderCallback(telegramID int64, gender string, callback *tg
 }
 func (b *Bot) handleDeptCallback(telegramID int64, dept string, callback *tgbotapi.CallbackQuery) {
 	deleteMsg := tgbotapi.NewDeleteMessage(telegramID, callback.Message.MessageID)
-	b.api.Send(deleteMsg)
+	_, _ = b.api.Send(deleteMsg)
 
 	_, stateData, _ := b.db.GetUserState(telegramID)
 	if stateData == "edit" {
@@ -66,7 +66,7 @@ func (b *Bot) handleDeptCallback(telegramID int64, dept string, callback *tgbota
 			b.sendMessage(telegramID, fmt.Sprintf("⚠️ %s", err.Error()), nil)
 			return
 		}
-		b.db.SetUserState(telegramID, models.StateNone, "")
+		_ = b.db.SetUserState(telegramID, models.StateNone, "")
 		b.sendMessage(telegramID, "✅ Profil berhasil diperbarui!", nil)
 		return
 	}

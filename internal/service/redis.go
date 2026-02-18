@@ -54,7 +54,7 @@ func (r *RedisService) AddToQueue(telegramID int64, val interface{}) error {
 		return err
 	}
 
-	r.RemoveFromQueue(telegramID)
+	_ = r.RemoveFromQueue(telegramID)
 
 	if err := r.client.RPush(r.ctx, key, raw).Err(); err != nil {
 		return err
@@ -80,7 +80,7 @@ func (r *RedisService) RemoveFromQueue(telegramID int64) error {
 		return err
 	}
 
-	r.client.LRem(r.ctx, key, 0, raw)
+	_ = r.client.LRem(r.ctx, key, 0, raw)
 	return r.client.HDel(r.ctx, trackKey, idStr).Err()
 }
 

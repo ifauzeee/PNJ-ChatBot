@@ -83,7 +83,7 @@ func (b *CSBot) handleMessage(msg *tgbotapi.Message) {
 	if telegramID == b.cfg.MaintenanceAccountID {
 		userID, _ := b.db.GetActiveCSSessionByAdmin(telegramID)
 		if userID > 0 {
-			b.db.UpdateCSSessionActivity(userID)
+			_ = b.db.UpdateCSSessionActivity(userID)
 			if msg.IsCommand() && (msg.Command() == "stop" || msg.Command() == "end") {
 				b.handleStop(userID)
 				return
@@ -105,7 +105,7 @@ func (b *CSBot) handleMessage(msg *tgbotapi.Message) {
 
 	adminID, _ := b.db.GetActiveCSSessionByUser(telegramID)
 	if adminID > 0 {
-		b.db.UpdateCSSessionActivity(telegramID)
+		_ = b.db.UpdateCSSessionActivity(telegramID)
 		if msg.IsCommand() && msg.Command() == "stop" {
 			b.handleStop(telegramID)
 			return
@@ -148,7 +148,7 @@ func (b *CSBot) handleChat(telegramID int64) {
 	if activeUserID == 0 {
 		b.startSession(telegramID)
 	} else {
-		b.db.JoinCSQueue(telegramID)
+		_ = b.db.JoinCSQueue(telegramID)
 		pos, _ := b.db.GetCSQueuePosition(telegramID)
 		b.sendMessage(telegramID, fmt.Sprintf("⏳ <b>Agen sedang melayani pengguna lain.</b>\n\nKamu telah masuk ke dalam antrian. Posisi kamu saat ini: <b>#%d</b>.\nMohon tunggu sebentar, kami akan memberitahumu secara otomatis jika sudah terhubung.", pos))
 	}
@@ -164,7 +164,7 @@ func (b *CSBot) startSession(userID int64) {
 		zap.Int64("user_id", userID),
 		zap.Int64("admin_id", b.cfg.MaintenanceAccountID),
 	)
-	b.db.LeaveCSQueue(userID)
+	_ = b.db.LeaveCSQueue(userID)
 	err := b.db.CreateCSSession(userID, b.cfg.MaintenanceAccountID)
 	if err != nil {
 		logger.Error("❌ Error creating CS session", zap.Error(err))
@@ -176,7 +176,7 @@ func (b *CSBot) startSession(userID int64) {
 }
 
 func (b *CSBot) endSession(userID int64, message string) {
-	b.db.EndCSSession(userID)
+	_ = b.db.EndCSSession(userID)
 	b.sendMessage(userID, message)
 	b.sendMessage(b.cfg.MaintenanceAccountID, fmt.Sprintf("🛑 <b>Sesi dengan user %d berakhir.</b>", userID))
 }

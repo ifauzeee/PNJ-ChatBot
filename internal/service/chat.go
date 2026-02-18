@@ -69,15 +69,15 @@ func (s *ChatService) SearchPartner(telegramID int64, preferredDept, preferredGe
 
 		if s.isMatch(item, preferredDept, preferredGender, preferredYear) {
 
-			s.redis.client.LRem(s.redis.ctx, queueKey, 1, raw)
+			_ = s.redis.client.LRem(s.redis.ctx, queueKey, 1, raw)
 
 			_, err := s.db.CreateChatSession(telegramID, item.TelegramID)
 			if err != nil {
 				return 0, err
 			}
 
-			s.db.SetUserState(telegramID, models.StateInChat, "")
-			s.db.SetUserState(item.TelegramID, models.StateInChat, "")
+			_ = s.db.SetUserState(telegramID, models.StateInChat, "")
+			_ = s.db.SetUserState(item.TelegramID, models.StateInChat, "")
 
 			logger.Debug("Chat matched",
 				zap.Int64("user1", telegramID),
@@ -104,7 +104,7 @@ func (s *ChatService) SearchPartner(telegramID int64, preferredDept, preferredGe
 		return 0, fmt.Errorf("gagal menambahkan ke antrian: %w", err)
 	}
 
-	s.db.SetUserState(telegramID, models.StateSearching, "")
+	_ = s.db.SetUserState(telegramID, models.StateSearching, "")
 	logger.Debug("Added to queue", zap.Int64("user_id", telegramID))
 	return 0, nil
 }
@@ -133,14 +133,14 @@ func (s *ChatService) isMatch(item QueueItem, prefDept, prefGender string, prefY
 }
 
 func (s *ChatService) StopChat(telegramID int64) (int64, error) {
-	s.redis.RemoveFromQueue(telegramID)
+	_ = s.redis.RemoveFromQueue(telegramID)
 
 	session, err := s.db.GetActiveSession(telegramID)
 	if err != nil {
 		return 0, err
 	}
 	if session == nil {
-		s.db.SetUserState(telegramID, models.StateNone, "")
+		_ = s.db.SetUserState(telegramID, models.StateNone, "")
 		return 0, nil
 	}
 
@@ -149,8 +149,8 @@ func (s *ChatService) StopChat(telegramID int64) (int64, error) {
 		return 0, err
 	}
 
-	s.db.SetUserState(telegramID, models.StateNone, "")
-	s.db.SetUserState(partnerID, models.StateNone, "")
+	_ = s.db.SetUserState(telegramID, models.StateNone, "")
+	_ = s.db.SetUserState(partnerID, models.StateNone, "")
 
 	return partnerID, nil
 }
@@ -181,8 +181,8 @@ func (s *ChatService) GetQueueCount() (int, error) {
 }
 
 func (s *ChatService) CancelSearch(telegramID int64) error {
-	s.redis.RemoveFromQueue(telegramID)
-	s.db.SetUserState(telegramID, models.StateNone, "")
+	_ = s.redis.RemoveFromQueue(telegramID)
+	_ = s.db.SetUserState(telegramID, models.StateNone, "")
 	return nil
 }
 
