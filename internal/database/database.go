@@ -56,8 +56,8 @@ func New(cfg *config.Config) (*DB, error) {
 	db.SetConnMaxLifetime(time.Hour)
 
 	if dbType == "sqlite" {
-		db.Exec("PRAGMA journal_mode=WAL")
-		db.Exec("PRAGMA foreign_keys=ON")
+		_, _ = db.Exec("PRAGMA journal_mode=WAL")
+		_, _ = db.Exec("PRAGMA foreign_keys=ON")
 	}
 
 	builder := squirrel.StatementBuilder.PlaceholderFormat(squirrel.Question)

@@ -186,7 +186,7 @@ func (b *Bot) startHealthServer(ctx context.Context) {
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(health)
+		_ = json.NewEncoder(w).Encode(health)
 	})
 
 	mux.HandleFunc("/ready", func(w http.ResponseWriter, r *http.Request) {
@@ -391,12 +391,14 @@ func (b *Bot) handleUpdate(update tgbotapi.Update) {
 		}
 		defer lock.Unlock()
 
-		streak, bonus, _ := b.gamification.UpdateStreak(userID)
-		if bonus {
-			b.gamification.RewardActivity(userID, "streak_bonus")
-			b.sendMessageHTML(userID, fmt.Sprintf("🔥 <b>STREAK LANJUT!</b>\nKamu sudah aktif selama <b>%d hari</b> berturut-turut! Dapat bonus poin dan exp.", streak), nil)
-		} else {
-			b.gamification.RewardActivity(userID, "daily_login")
+		streak, bonus, errStreak := b.gamification.UpdateStreak(userID)
+		if errStreak == nil {
+			if bonus {
+				_, _, _, _, _ = b.gamification.RewardActivity(userID, "streak_bonus")
+				b.sendMessageHTML(userID, fmt.Sprintf("🔥 <b>STREAK LANJUT!</b>\nKamu sudah aktif selama <b>%d hari</b> berturut-turut! Dapat bonus poin dan exp.", streak), nil)
+			} else {
+				_, _, _, _, _ = b.gamification.RewardActivity(userID, "daily_login")
+			}
 		}
 	}
 

@@ -29,11 +29,11 @@ func (d *DB) StopChat(telegramID int64) (int64, error) {
 
 	duration := time.Since(session.StartedAt).Minutes()
 	if duration >= 10 {
-		d.IncrementUserKarma(session.User1ID, 2)
-		d.IncrementUserKarma(session.User2ID, 2)
+		_ = d.IncrementUserKarma(session.User1ID, 2)
+		_ = d.IncrementUserKarma(session.User2ID, 2)
 	} else if duration >= 5 {
-		d.IncrementUserKarma(session.User1ID, 1)
-		d.IncrementUserKarma(session.User2ID, 1)
+		_ = d.IncrementUserKarma(session.User1ID, 1)
+		_ = d.IncrementUserKarma(session.User2ID, 1)
 	}
 
 	return partnerID, nil
@@ -51,8 +51,8 @@ func (d *DB) CreateChatSession(user1ID, user2ID int64) (*models.ChatSession, err
 		return nil, fmt.Errorf("failed to create chat session: %w", err)
 	}
 
-	d.IncrementTotalChats(user1ID)
-	d.IncrementTotalChats(user2ID)
+	_ = d.IncrementTotalChats(user1ID)
+	_ = d.IncrementTotalChats(user2ID)
 
 	return &models.ChatSession{
 		ID:        id,

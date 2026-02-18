@@ -54,7 +54,7 @@ Contoh: <i>nama@mhsw.pnj.ac.id / nama@stu.pnj.ac.id</i>
 
 ⚠️ Pastikan email kamu benar dan aktif.`
 
-	b.db.SetUserState(telegramID, models.StateAwaitingEmail, "")
+	_ = b.db.SetUserState(telegramID, models.StateAwaitingEmail, "")
 	b.sendMessageHTML(telegramID, registText, nil)
 }
 

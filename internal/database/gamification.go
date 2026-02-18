@@ -11,7 +11,7 @@ func (d *DB) AddPointsAndExp(telegramID int64, points, exp int) (newLevel int, l
 	if err != nil {
 		return 0, false, err
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	var current models.User
 	query, args, _ := d.Builder.Select("level", "exp", "points").From("users").Where("telegram_id = ?", telegramID).ToSql()
@@ -55,7 +55,7 @@ func (d *DB) UpdateDailyStreak(telegramID int64) (newStreak int, streakBonus boo
 	if err != nil {
 		return 0, false, err
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	var lastActive time.Time
 	var currentStreak int

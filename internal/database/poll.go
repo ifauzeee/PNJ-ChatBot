@@ -14,7 +14,7 @@ func (d *DB) CreatePoll(authorID int64, question string, options []string) (int6
 	if err != nil {
 		return 0, err
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	builder := d.Builder.Insert("polls").
 		Columns("author_id", "question", "created_at").
