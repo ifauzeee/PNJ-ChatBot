@@ -54,7 +54,7 @@ func (b *Bot) handleCircleMessage(msg *tgbotapi.Message) {
 
 	members, roomName, err := b.room.GetRoomMembers(telegramID)
 	if err != nil {
-		b.db.SetUserState(telegramID, models.StateNone, "")
+		_ = b.db.SetUserState(telegramID, models.StateNone, "")
 		b.sendMessage(telegramID, "⚠️ Kamu tidak berada di circle aktif. Gunakan /circles untuk bergabung.", nil)
 		return
 	}
@@ -102,7 +102,7 @@ func (b *Bot) handleRoomNameInput(msg *tgbotapi.Message) {
 		return
 	}
 
-	b.db.SetUserState(telegramID, models.StateAwaitingRoomDesc, name)
+	_ = b.db.SetUserState(telegramID, models.StateAwaitingRoomDesc, name)
 	b.sendMessage(telegramID, fmt.Sprintf("📝 *Nama Circle:* %s\n\nSekarang tulis *Deskripsi Singkat* untuk circle ini:", name), nil)
 }
 
@@ -119,14 +119,14 @@ func (b *Bot) handleRoomDescInput(msg *tgbotapi.Message) {
 	room, err := b.room.CreateRoom(name, desc)
 	if err != nil {
 		b.sendMessage(telegramID, fmt.Sprintf("❌ %s", err.Error()), nil)
-		b.db.SetUserState(telegramID, models.StateNone, "")
+		_ = b.db.SetUserState(telegramID, models.StateNone, "")
 		return
 	}
 
-	b.db.SetUserState(telegramID, models.StateNone, "")
+	_ = b.db.SetUserState(telegramID, models.StateNone, "")
 	b.sendMessageHTML(telegramID, fmt.Sprintf("✅ <b>Circle Berhasil Dibuat!</b>\n\nSekarang kamu dan orang lain bisa bergabung ke <b>%s</b> melalui menu /circles.", room.Name), nil)
 
-	b.room.JoinRoom(telegramID, room.Slug)
+	_, _ = b.room.JoinRoom(telegramID, room.Slug)
 
 	kb := LeaveCircleKeyboard()
 	b.sendMessageHTML(telegramID, fmt.Sprintf("🎉 Kamu otomatis bergabung ke circle <b>%s</b>. Selamat ngobrol!", room.Name), &kb)

@@ -53,7 +53,7 @@ func (s *RoomService) JoinRoom(telegramID int64, slug string) (*models.Room, err
 		return nil, fmt.Errorf("circle tidak ditemukan")
 	}
 
-	s.db.RemoveMemberFromAllRooms(telegramID)
+	_ = s.db.RemoveMemberFromAllRooms(telegramID)
 
 	err = s.db.AddRoomMember(room.ID, telegramID)
 	if err != nil {

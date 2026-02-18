@@ -37,7 +37,7 @@ func (b *Bot) forwardMedia(targetID int64, msg *tgbotapi.Message, captionPrefix 
 				File:     tgbotapi.FileID(msg.Sticker.FileID),
 			},
 		}
-		b.api.Send(stickerCfg)
+		_, _ = b.api.Send(stickerCfg)
 	} else if msg.Photo != nil {
 		photos := msg.Photo
 		photo := photos[len(photos)-1]
@@ -46,28 +46,28 @@ func (b *Bot) forwardMedia(targetID int64, msg *tgbotapi.Message, captionPrefix 
 		if msg.Caption != "" {
 			photoMsg.Caption += "\n\n" + msg.Caption
 		}
-		b.api.Send(photoMsg)
+		_, _ = b.api.Send(photoMsg)
 	} else if msg.Voice != nil {
 		voice := tgbotapi.NewVoice(targetID, tgbotapi.FileID(msg.Voice.FileID))
 		voice.Caption = captionPrefix
-		b.api.Send(voice)
+		_, _ = b.api.Send(voice)
 	} else if msg.Video != nil {
 		video := tgbotapi.NewVideo(targetID, tgbotapi.FileID(msg.Video.FileID))
 		video.Caption = captionPrefix
 		if msg.Caption != "" {
 			video.Caption += "\n\n" + msg.Caption
 		}
-		b.api.Send(video)
+		_, _ = b.api.Send(video)
 	} else if msg.Document != nil {
 		doc := tgbotapi.NewDocument(targetID, tgbotapi.FileID(msg.Document.FileID))
 		doc.Caption = captionPrefix
 		if msg.Caption != "" {
 			doc.Caption += "\n\n" + msg.Caption
 		}
-		b.api.Send(doc)
+		_, _ = b.api.Send(doc)
 	} else if msg.Animation != nil {
 		anim := tgbotapi.NewAnimation(targetID, tgbotapi.FileID(msg.Animation.FileID))
-		b.api.Send(anim)
+		_, _ = b.api.Send(anim)
 	}
 }
 

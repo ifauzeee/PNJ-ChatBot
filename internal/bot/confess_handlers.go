@@ -14,7 +14,7 @@ import (
 func (b *Bot) handleConfess(msg *tgbotapi.Message) {
 	telegramID := msg.From.ID
 
-	b.db.SetUserState(telegramID, models.StateAwaitingConfess, "")
+	_ = b.db.SetUserState(telegramID, models.StateAwaitingConfess, "")
 
 	b.sendMessage(telegramID, `💬 *Tulis Confession Kamu*
 
@@ -52,7 +52,7 @@ func (b *Bot) handleConfessionInput(msg *tgbotapi.Message) {
 		return
 	}
 
-	b.db.SetUserState(telegramID, models.StateNone, "")
+	_ = b.db.SetUserState(telegramID, models.StateNone, "")
 	b.checkAchievements(telegramID)
 	b.processReward(telegramID, "confession_created")
 
@@ -173,7 +173,7 @@ func (b *Bot) handleReply(msg *tgbotapi.Message) {
 
 	confession, _ := b.db.GetConfession(confessionID)
 	if confession != nil && confession.AuthorID != telegramID {
-		b.db.IncrementUserKarma(confession.AuthorID, 1)
+		_ = b.db.IncrementUserKarma(confession.AuthorID, 1)
 		b.checkAchievements(confession.AuthorID)
 	}
 

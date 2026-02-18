@@ -48,7 +48,7 @@ Contoh: <code>/poll Setuju gak harga parkir naik? | Setuju | Tidak Setuju</code>
 		return
 	}
 
-	b.db.IncrementUserKarma(telegramID, 3)
+	_ = b.db.IncrementUserKarma(telegramID, 3)
 	b.checkAchievements(telegramID)
 
 	b.sendMessageHTML(telegramID, fmt.Sprintf("✅ <b>Polling #%d berhasil dibuat!</b>\nSemua mahasiswa sekarang bisa memberikan suara secara anonim.", pollID), nil)

@@ -109,7 +109,7 @@ func (s *ProfileService) ReportUser(reporterID, reportedID int64, reason, eviden
 	}
 
 	if newCount >= s.cfg.AutoBanReportCount {
-		s.db.UpdateUserBanned(reportedID, true)
+		_ = s.db.UpdateUserBanned(reportedID, true)
 	}
 
 	return newCount, nil
@@ -155,7 +155,7 @@ var (
 )
 
 func generateDisplayName() string {
-	r := rand.New(rand.NewSource(time.Now().UnixNano()))
+	r := rand.New(rand.NewSource(time.Now().UnixNano())) // #nosec G404
 	adj := adjectives[r.Intn(len(adjectives))]
 	animal := animals[r.Intn(len(animals))]
 	num := r.Intn(999) + 1

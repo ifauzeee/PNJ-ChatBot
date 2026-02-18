@@ -55,7 +55,7 @@ func (b *Bot) startSearch(telegramID int64, preferredDept, preferredGender strin
 		preferredDept = ""
 	}
 
-	b.room.LeaveRoom(telegramID)
+	_ = b.room.LeaveRoom(telegramID)
 
 	matchID, err := b.chat.SearchPartner(telegramID, preferredDept, preferredGender, preferredYear)
 	if err != nil {
@@ -141,7 +141,7 @@ Apakah kamu ingin keluar dari Circle dan mencari partner baru?`, roomName), &kb)
 		return
 	}
 
-	b.room.LeaveRoom(telegramID)
+	_ = b.room.LeaveRoom(telegramID)
 
 	partnerID, err := b.chat.NextPartner(telegramID)
 	if err != nil {
@@ -162,7 +162,7 @@ func (b *Bot) handleStop(msg *tgbotapi.Message) {
 
 	state, _, _ := b.db.GetUserState(telegramID)
 	if state == models.StateSearching {
-		b.chat.CancelSearch(telegramID)
+		_ = b.chat.CancelSearch(telegramID)
 		b.sendMessage(telegramID, "🛑 Pencarian dihentikan.", nil)
 		return
 	}
@@ -194,7 +194,7 @@ func (b *Bot) handleChatMessage(msg *tgbotapi.Message) {
 
 	partnerID, err := b.chat.GetPartner(telegramID)
 	if err != nil || partnerID == 0 {
-		b.db.SetUserState(telegramID, models.StateNone, "")
+		_ = b.db.SetUserState(telegramID, models.StateNone, "")
 		b.sendMessage(telegramID, "⚠️ Chat tidak aktif. Gunakan /search untuk mencari partner.", nil)
 		return
 	}
@@ -223,7 +223,7 @@ func (b *Bot) handleChatMessage(msg *tgbotapi.Message) {
 
 	case msg.Voice != nil:
 		voice := tgbotapi.NewVoice(partnerID, tgbotapi.FileID(msg.Voice.FileID))
-		b.api.Send(voice)
+		_, _ = b.api.Send(voice)
 
 	case msg.Video != nil:
 		video := tgbotapi.NewVideo(partnerID, tgbotapi.FileID(msg.Video.FileID))
@@ -241,7 +241,7 @@ func (b *Bot) handleChatMessage(msg *tgbotapi.Message) {
 		if msg.Caption != "" {
 			doc.Caption = msg.Caption
 		}
-		b.api.Send(doc)
+		_, _ = b.api.Send(doc)
 
 	case msg.VideoNote != nil:
 		vnCfg := tgbotapi.VideoNoteConfig{
@@ -251,7 +251,7 @@ func (b *Bot) handleChatMessage(msg *tgbotapi.Message) {
 			},
 			Length: msg.VideoNote.Length,
 		}
-		b.api.Send(vnCfg)
+		_, _ = b.api.Send(vnCfg)
 
 	default:
 		b.sendMessage(telegramID, "⚠️ Tipe pesan ini tidak didukung.", nil)
@@ -284,7 +284,7 @@ func (b *Bot) forwardMatchedMedia(partnerID int64, msg *tgbotapi.Message) {
 				File:     tgbotapi.FileID(msg.Sticker.FileID),
 			},
 		}
-		b.api.Send(stickerCfg)
+		_, _ = b.api.Send(stickerCfg)
 	} else if msg.Photo != nil {
 		photos := msg.Photo
 		photo := photos[len(photos)-1]
@@ -299,12 +299,12 @@ func (b *Bot) forwardMatchedMedia(partnerID int64, msg *tgbotapi.Message) {
 		go b.deleteMessageAfterDelay(partnerID, sentMsg.MessageID, 10*time.Second)
 	} else if msg.Animation != nil {
 		anim := tgbotapi.NewAnimation(partnerID, tgbotapi.FileID(msg.Animation.FileID))
-		b.api.Send(anim)
+		_, _ = b.api.Send(anim)
 	}
 }
 
 func (b *Bot) deleteMessageAfterDelay(chatID int64, messageID int, delay time.Duration) {
 	time.Sleep(delay)
 	deleteMsg := tgbotapi.NewDeleteMessage(chatID, messageID)
-	b.api.Send(deleteMsg)
+	_, _ = b.api.Send(deleteMsg)
 }

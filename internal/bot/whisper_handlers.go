@@ -46,7 +46,7 @@ func (b *Bot) handleWhisperInput(msg *tgbotapi.Message, targetDept string) {
 		return
 	}
 
-	b.db.SetUserState(telegramID, models.StateNone, "")
+	_ = b.db.SetUserState(telegramID, models.StateNone, "")
 
 	user, _ := b.db.GetUser(telegramID)
 	senderDept := ""

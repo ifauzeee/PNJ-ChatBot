@@ -47,21 +47,21 @@ Ketik /regist dan ikuti proses verifikasi email PNJ kamu.`, html.EscapeString(ms
 		b.sendMessage(telegramID, "👤 *Pilih Gender Kamu:*", nil)
 		kb := GenderKeyboard()
 		b.sendMessage(telegramID, "👇 Silakan pilih:", &kb)
-		b.db.SetUserState(telegramID, models.StateAwaitingGender, "")
+		_ = b.db.SetUserState(telegramID, models.StateAwaitingGender, "")
 		return
 	}
 
 	if user.Year == 0 {
 		kb := YearKeyboard()
 		b.sendMessage(telegramID, "🎓 *Pilih Tahun Angkatan Kamu:*", &kb)
-		b.db.SetUserState(telegramID, models.StateAwaitingYear, "")
+		_ = b.db.SetUserState(telegramID, models.StateAwaitingYear, "")
 		return
 	}
 
 	if string(user.Department) == "" {
 		kb := DepartmentKeyboard()
 		b.sendMessage(telegramID, "🏛️ *Pilih Jurusan Kamu:*\n\nPilih jurusan di bawah ini:", &kb)
-		b.db.SetUserState(telegramID, models.StateAwaitingDept, "")
+		_ = b.db.SetUserState(telegramID, models.StateAwaitingDept, "")
 		return
 	}
 
@@ -177,21 +177,21 @@ func (b *Bot) handleCancel(msg *tgbotapi.Message) {
 
 	switch state {
 	case models.StateSearching:
-		b.chat.CancelSearch(telegramID)
+		_ = b.chat.CancelSearch(telegramID)
 		b.sendMessage(telegramID, "❌ Pencarian dibatalkan.", nil)
 	case models.StateAwaitingConfess:
-		b.db.SetUserState(telegramID, models.StateNone, "")
+		_ = b.db.SetUserState(telegramID, models.StateNone, "")
 		b.sendMessage(telegramID, "❌ Confession dibatalkan.", nil)
 	case models.StateAwaitingWhisper, models.StateAwaitingWhisperDept:
-		b.db.SetUserState(telegramID, models.StateNone, "")
+		_ = b.db.SetUserState(telegramID, models.StateNone, "")
 		b.sendMessage(telegramID, "❌ Whisper dibatalkan.", nil)
 	case models.StateAwaitingReport:
-		b.db.SetUserState(telegramID, models.StateNone, "")
+		_ = b.db.SetUserState(telegramID, models.StateNone, "")
 		b.sendMessage(telegramID, "❌ Report dibatalkan.", nil)
 	case models.StateInCircle:
 		b.handleLeaveCircle(msg)
 	case models.StateAwaitingRoomName, models.StateAwaitingRoomDesc:
-		b.db.SetUserState(telegramID, models.StateNone, "")
+		_ = b.db.SetUserState(telegramID, models.StateNone, "")
 		b.sendMessage(telegramID, "❌ Pembuatan circle dibatalkan.", nil)
 	default:
 		b.sendMessage(telegramID, "💡 Tidak ada aksi yang perlu dibatalkan.", nil)

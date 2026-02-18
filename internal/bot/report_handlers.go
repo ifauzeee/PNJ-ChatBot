@@ -18,7 +18,7 @@ func (b *Bot) handleReport(msg *tgbotapi.Message) {
 		return
 	}
 
-	b.db.SetUserState(telegramID, models.StateAwaitingReport, fmt.Sprintf("%d", partnerID))
+	_ = b.db.SetUserState(telegramID, models.StateAwaitingReport, fmt.Sprintf("%d", partnerID))
 	b.sendMessage(telegramID, `⚠️ *Laporkan Partner*
 
 Tuliskan alasan kamu melaporkan partner ini.
@@ -32,11 +32,11 @@ func (b *Bot) handleReportInput(msg *tgbotapi.Message) {
 	_, stateData, _ := b.db.GetUserState(telegramID)
 
 	var reportedID int64
-	fmt.Sscanf(stateData, "%d", &reportedID)
+	_, _ = fmt.Sscanf(stateData, "%d", &reportedID)
 
 	if reportedID == 0 {
 		b.sendMessage(telegramID, "⚠️ Terjadi kesalahan. Coba lagi.", nil)
-		b.db.SetUserState(telegramID, models.StateNone, "")
+		_ = b.db.SetUserState(telegramID, models.StateNone, "")
 		return
 	}
 
@@ -68,7 +68,7 @@ Mohon patuhi aturan komunitas agar akun kamu tidak diblokir secara otomatis oleh
 		b.sendMessageHTML(reportedID, "🚫 <b>Akun kamu telah diblokir otomatis oleh sistem karena telah mencapai batas laporan (3/3).</b> Kamu tidak bisa lagi menggunakan bot ini.", nil)
 	}
 
-	b.db.SetUserState(telegramID, models.StateNone, "")
+	_ = b.db.SetUserState(telegramID, models.StateNone, "")
 	b.sendMessageHTML(telegramID, "✅ <b>Laporan Terkirim!</b>\n\nTerima kasih atas laporanmu. Tim kami akan meninjau laporan ini.", nil)
 }
 
@@ -81,9 +81,9 @@ func (b *Bot) handleBlock(msg *tgbotapi.Message) {
 		return
 	}
 
-	b.profile.BlockUser(telegramID, partnerID)
+	_ = b.profile.BlockUser(telegramID, partnerID)
 
-	b.chat.StopChat(telegramID)
+	_, _ = b.chat.StopChat(telegramID)
 
 	b.sendMessage(partnerID, "👋 *Partner kamu telah memutus chat.*", nil)
 	b.sendMessage(telegramID, "🚫 *Partner telah di-block.*\n\nKamu tidak akan dipasangkan dengan user ini lagi.", nil)
