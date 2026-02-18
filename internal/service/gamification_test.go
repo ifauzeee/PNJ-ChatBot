@@ -63,13 +63,13 @@ func TestLeaderboard(t *testing.T) {
 	createUserForTest(t, db, 8001, "", "", 0)
 	createUserForTest(t, db, 8002, "", "", 0)
 
-	db.UpdateUserVerified(8001, true)
-	db.UpdateUserVerified(8002, true)
-	db.UpdateUserDisplayName(8001, "User A")
-	db.UpdateUserDisplayName(8002, "User B")
+	_ = db.UpdateUserVerified(8001, true)
+	_ = db.UpdateUserVerified(8002, true)
+	_ = db.UpdateUserDisplayName(8001, "User A")
+	_ = db.UpdateUserDisplayName(8002, "User B")
 
-	db.AddPointsAndExp(8001, 100, 500)
-	db.AddPointsAndExp(8002, 50, 250)
+	_ = db.AddPointsAndExp(8001, 100, 500)
+	_ = db.AddPointsAndExp(8002, 50, 250)
 
 	leaderboard, err := gamificationSvc.GetLeaderboard()
 	if err != nil {

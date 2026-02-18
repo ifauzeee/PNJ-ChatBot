@@ -95,7 +95,7 @@ func (b *Bot) handleDeptCallback(telegramID int64, dept string, callback *tgbota
 func (b *Bot) handleSearchCallback(telegramID int64, value string, callback *tgbotapi.CallbackQuery) {
 	if value == "cancel" {
 		deleteMsg := tgbotapi.NewDeleteMessage(telegramID, callback.Message.MessageID)
-		b.api.Send(deleteMsg)
+		_, _ = b.api.Send(deleteMsg)
 		_ = b.chat.CancelSearch(telegramID)
 		b.sendMessage(telegramID, "❌ Pencarian dibatalkan.", nil)
 		return
@@ -103,7 +103,7 @@ func (b *Bot) handleSearchCallback(telegramID int64, value string, callback *tgb
 
 	if value == "any" {
 		deleteMsg := tgbotapi.NewDeleteMessage(telegramID, callback.Message.MessageID)
-		b.api.Send(deleteMsg)
+		_, _ = b.api.Send(deleteMsg)
 		b.startSearch(telegramID, "", "", 0)
 		return
 	}
@@ -113,7 +113,7 @@ func (b *Bot) handleSearchCallback(telegramID int64, value string, callback *tgb
 		editMsg := tgbotapi.NewEditMessageText(telegramID, callback.Message.MessageID, "👫 *Pilih Gender Partner:*")
 		editMsg.ParseMode = "Markdown"
 		editMsg.ReplyMarkup = &kb
-		b.api.Send(editMsg)
+		_, _ = b.api.Send(editMsg)
 		return
 	}
 
@@ -122,7 +122,7 @@ func (b *Bot) handleSearchCallback(telegramID int64, value string, callback *tgb
 		editMsg := tgbotapi.NewEditMessageText(telegramID, callback.Message.MessageID, "🏛️ *Pilih Jurusan Partner:*")
 		editMsg.ParseMode = "Markdown"
 		editMsg.ReplyMarkup = &kb
-		b.api.Send(editMsg)
+		_, _ = b.api.Send(editMsg)
 		return
 	}
 
@@ -131,13 +131,13 @@ func (b *Bot) handleSearchCallback(telegramID int64, value string, callback *tgb
 		editMsg := tgbotapi.NewEditMessageText(telegramID, callback.Message.MessageID, "🎓 *Pilih Angkatan Partner:*")
 		editMsg.ParseMode = "Markdown"
 		editMsg.ReplyMarkup = &kb
-		b.api.Send(editMsg)
+		_, _ = b.api.Send(editMsg)
 		return
 	}
 
 	if strings.HasPrefix(value, "year:") {
 		deleteMsg := tgbotapi.NewDeleteMessage(telegramID, callback.Message.MessageID)
-		b.api.Send(deleteMsg)
+		_, _ = b.api.Send(deleteMsg)
 		yearStr := strings.TrimPrefix(value, "year:")
 		year, _ := strconv.Atoi(yearStr)
 		b.startSearch(telegramID, "", "", year)
@@ -146,7 +146,7 @@ func (b *Bot) handleSearchCallback(telegramID int64, value string, callback *tgb
 
 	if strings.HasPrefix(value, "gender:") {
 		deleteMsg := tgbotapi.NewDeleteMessage(telegramID, callback.Message.MessageID)
-		b.api.Send(deleteMsg)
+		_, _ = b.api.Send(deleteMsg)
 		gender := strings.TrimPrefix(value, "gender:")
 		b.startSearch(telegramID, "", gender, 0)
 		return
@@ -154,7 +154,7 @@ func (b *Bot) handleSearchCallback(telegramID int64, value string, callback *tgb
 
 	if strings.HasPrefix(value, "dept:") {
 		deleteMsg := tgbotapi.NewDeleteMessage(telegramID, callback.Message.MessageID)
-		b.api.Send(deleteMsg)
+		_, _ = b.api.Send(deleteMsg)
 		dept := strings.TrimPrefix(value, "dept:")
 		b.startSearch(telegramID, dept, "", 0)
 		return
@@ -201,7 +201,7 @@ func (b *Bot) handleChatActionCallback(telegramID int64, action string, _ *tgbot
 			b.sendMessage(telegramID, "⚠️ Tidak ada partner saat ini.", nil)
 			return
 		}
-		b.profile.BlockUser(telegramID, partnerID)
+		_ = b.profile.BlockUser(telegramID, partnerID)
 		_, _ = b.chat.StopChat(telegramID)
 		b.sendMessage(partnerID, "👋 *Partner kamu telah memutus chat.*", nil)
 		b.sendMessage(telegramID, "🚫 *Partner telah di-block.*", nil)
