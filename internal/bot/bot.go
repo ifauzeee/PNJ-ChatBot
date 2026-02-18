@@ -66,6 +66,8 @@ type Bot struct {
 	updateWG     sync.WaitGroup
 	background   sync.WaitGroup
 	userLocks    sync.Map
+	handlers     map[string]func(*tgbotapi.Message)
+	callbacks    map[string]func(int64, string, *tgbotapi.CallbackQuery)
 }
 
 func New(cfg *config.Config, db *database.DB) (*Bot, error) {
@@ -96,8 +98,56 @@ func New(cfg *config.Config, db *database.DB) (*Bot, error) {
 		updateQ:      make(chan tgbotapi.Update, cfg.MaxUpdateQueue),
 	}
 
+	bot.registerHandlers()
 	logger.Info("🤖 Bot authorized", zap.String("username", api.Self.UserName))
 	return bot, nil
+}
+
+func (b *Bot) registerHandlers() {
+	b.handlers = map[string]func(*tgbotapi.Message){
+		"start":        b.handleStart,
+		"regist":       b.handleRegist,
+		"help":         b.handleHelp,
+		"about":        b.handleAbout,
+		"cancel":       b.handleCancel,
+		"search":       b.handleSearch,
+		"next":         b.handleNext,
+		"stop":         b.handleStop,
+		"confess":      b.handleConfess,
+		"confessions":  b.handleConfessions,
+		"react":        b.handleReact,
+		"reply":        b.handleReply,
+		"view_replies": b.handleViewReplies,
+		"poll":         b.handlePoll,
+		"polls":        b.handleViewPolls,
+		"vote_poll":    b.handleVotePoll,
+		"whisper":      b.handleWhisper,
+		"profile":      b.handleProfile,
+		"stats":        b.handleStats,
+		"leaderboard":  b.handleLeaderboard,
+		"admin_poll":   b.handleAdminPoll,
+		"broadcast":    b.handleBroadcast,
+		"edit":         b.handleEdit,
+		"report":       b.handleReport,
+		"block":        b.handleBlock,
+		"circles":      b.handleCircles,
+		"leave_circle": b.handleLeaveCircle,
+	}
+
+	b.callbacks = map[string]func(int64, string, *tgbotapi.CallbackQuery){
+		"gender":  b.handleGenderCallback,
+		"dept":    b.handleDeptCallback,
+		"search":  b.handleSearchCallback,
+		"chat":    b.handleChatActionCallback,
+		"menu":    b.handleMenuCallback,
+		"edit":    b.handleEditCallback,
+		"vote":    b.handleVoteCallback,
+		"year":    b.handleYearCallback,
+		"react":   b.handleReactionCallback,
+		"whisper": b.handleWhisperCallback,
+		"legal":   b.handleLegalCallback,
+		"circle":  b.handleCircleCallback,
+	}
 }
 
 type HealthResponse struct {
@@ -409,78 +459,29 @@ func (b *Bot) getUserLock(userID int64) *sync.Mutex {
 
 func (b *Bot) handleCommand(msg *tgbotapi.Message) {
 	telegramID := msg.From.ID
+	command := msg.Command()
 
-	switch msg.Command() {
-	case "start":
-		b.handleStart(msg)
-	case "regist":
-		b.handleRegist(msg)
-	case "help":
-		b.handleHelp(msg)
-	case "about":
-		b.handleAbout(msg)
-	case "cancel":
-		b.handleCancel(msg)
-	default:
-
-		if !b.requireVerification(msg) {
-			return
-		}
-
-		if banned, _ := b.auth.IsBanned(telegramID); banned {
-			b.sendMessage(telegramID, "🚫 *Akun kamu telah di-banned.*\n\nKamu tidak bisa menggunakan bot ini karena telah melanggar aturan.", nil)
-			return
-		}
-
-		switch msg.Command() {
-		case "search":
-			b.handleSearch(msg)
-		case "next":
-			b.handleNext(msg)
-		case "stop":
-			b.handleStop(msg)
-		case "confess":
-			b.handleConfess(msg)
-		case "confessions":
-			b.handleConfessions(msg)
-		case "react":
-			b.handleReact(msg)
-		case "reply":
-			b.handleReply(msg)
-		case "view_replies":
-			b.handleViewReplies(msg)
-		case "poll":
-			b.handlePoll(msg)
-		case "polls":
-			b.handleViewPolls(msg)
-		case "vote_poll":
-			b.handleVotePoll(msg)
-		case "whisper":
-			b.handleWhisper(msg)
-		case "profile":
-			b.handleProfile(msg)
-		case "stats":
-			b.handleStats(msg)
-		case "leaderboard":
-			b.handleLeaderboard(msg)
-		case "admin_poll":
-			b.handleAdminPoll(msg)
-		case "broadcast":
-			b.handleBroadcast(msg)
-		case "edit":
-			b.handleEdit(msg)
-		case "report":
-			b.handleReport(msg)
-		case "block":
-			b.handleBlock(msg)
-		case "circles":
-			b.handleCircles(msg)
-		case "leave_circle":
-			b.handleLeaveCircle(msg)
-		default:
-			b.sendMessage(telegramID, "❓ Perintah tidak dikenali. Ketik /help untuk bantuan.", nil)
-		}
+	handler, exists := b.handlers[command]
+	if !exists {
+		b.sendMessage(telegramID, "❓ Perintah tidak dikenali. Ketik /help untuk bantuan.", nil)
+		return
 	}
+
+	if command == "start" || command == "help" || command == "about" || command == "cancel" {
+		handler(msg)
+		return
+	}
+
+	if !b.requireVerification(msg) {
+		return
+	}
+
+	if banned, _ := b.auth.IsBanned(telegramID); banned {
+		b.sendMessage(telegramID, "🚫 *Akun kamu telah di-banned.*\n\nKamu tidak bisa menggunakan bot ini karena telah melanggar aturan.", nil)
+		return
+	}
+
+	handler(msg)
 }
 
 func (b *Bot) handleMessage(msg *tgbotapi.Message) {

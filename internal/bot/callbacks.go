@@ -24,31 +24,8 @@ func (b *Bot) handleCallback(callback *tgbotapi.CallbackQuery) {
 	category := parts[0]
 	value := parts[1]
 
-	switch category {
-	case "gender":
-		b.handleGenderCallback(telegramID, value, callback)
-	case "dept":
-		b.handleDeptCallback(telegramID, value, callback)
-	case "search":
-		b.handleSearchCallback(telegramID, value, callback)
-	case "chat":
-		b.handleChatActionCallback(telegramID, value, callback)
-	case "menu":
-		b.handleMenuCallback(telegramID, value, callback)
-	case "edit":
-		b.handleEditCallback(telegramID, value, callback)
-	case "vote":
-		b.handleVoteCallback(telegramID, value, callback)
-	case "year":
-		b.handleYearCallback(telegramID, value, callback)
-	case "react":
-		b.handleReactionCallback(telegramID, value, callback)
-	case "whisper":
-		b.handleWhisperCallback(telegramID, value, callback)
-	case "legal":
-		b.handleLegalCallback(telegramID, value, callback)
-	case "circle":
-		b.handleCircleCallback(telegramID, value, callback)
+	if handler, exists := b.callbacks[category]; exists {
+		handler(telegramID, value, callback)
 	}
 }
 

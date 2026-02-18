@@ -100,8 +100,7 @@ func (s *ChatService) SearchPartner(telegramID int64, preferredDept, preferredGe
 		Year:       preferredYear,
 		JoinedAt:   time.Now().Unix(),
 	}
-	raw, _ := json.Marshal(newItem)
-	if err := s.redis.client.RPush(s.redis.ctx, queueKey, raw).Err(); err != nil {
+	if err := s.redis.AddToQueue(telegramID, newItem); err != nil {
 		return 0, fmt.Errorf("gagal menambahkan ke antrian: %w", err)
 	}
 
@@ -202,7 +201,7 @@ func (s *ChatService) ProcessQueueTimeout(timeoutSeconds int) ([]int64, error) {
 	updatedIDs := make([]int64, 0)
 	invalidItems := make(map[string]struct{})
 
-	for idx, raw := range items {
+	for _, raw := range items {
 		var item QueueItem
 		if err := json.Unmarshal([]byte(raw), &item); err != nil || item.TelegramID == 0 {
 			invalidItems[raw] = struct{}{}
@@ -228,12 +227,7 @@ func (s *ChatService) ProcessQueueTimeout(timeoutSeconds int) ([]int64, error) {
 			continue
 		}
 
-		updatedRaw, err := json.Marshal(item)
-		if err != nil {
-			continue
-		}
-
-		if err := s.redis.client.LSet(s.redis.ctx, queueKey, int64(idx), updatedRaw).Err(); err != nil {
+		if err := s.redis.AddToQueue(item.TelegramID, item); err != nil {
 			logger.Warn("Failed to update queue item", zap.Int64("user_id", item.TelegramID), zap.Error(err))
 		}
 	}

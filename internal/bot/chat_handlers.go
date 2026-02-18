@@ -201,28 +201,11 @@ func (b *Bot) handleChatMessage(msg *tgbotapi.Message) {
 
 	session, _ := b.db.GetActiveSession(telegramID)
 	if session != nil {
-		msgType := "text"
-		content := msg.Text
-		if msg.Sticker != nil {
-			msgType = "sticker"
-			content = "Sticker:" + msg.Sticker.FileID
-		} else if msg.Photo != nil {
-			msgType = "photo"
-			content = "Photo:" + msg.Photo[len(msg.Photo)-1].FileID
-		} else if msg.Voice != nil {
-			msgType = "voice"
-			content = "Voice:" + msg.Voice.FileID
-		} else if msg.Video != nil {
-			msgType = "video"
-			content = "Video:" + msg.Video.FileID
-		} else if msg.Animation != nil {
-			msgType = "animation"
-			content = "Animation:" + msg.Animation.FileID
-		}
-		b.evidence.LogMessage(session.ID, telegramID, content, msgType)
+		b.logSessionEvidence(session.ID, telegramID, msg)
 	}
 
-	if msg.Text != "" {
+	switch {
+	case msg.Text != "":
 		text := msg.Text
 		if b.profanity.IsBad(text) {
 			text = b.profanity.Clean(text)
@@ -230,44 +213,19 @@ func (b *Bot) handleChatMessage(msg *tgbotapi.Message) {
 		}
 		b.sendMessage(partnerID, fmt.Sprintf("💬 *Stranger:*\n%s", escapeMarkdown(text)), nil)
 		b.processReward(telegramID, "chat_message")
-	} else if msg.Sticker != nil || msg.Photo != nil || msg.Animation != nil {
+
+	case msg.Sticker != nil, msg.Photo != nil, msg.Animation != nil:
 		if safe, reason := b.isSafeMedia(msg); !safe {
 			b.sendMessage(telegramID, "🚫 *Konten diblokir:* "+reason, nil)
 			return
 		}
+		b.forwardMatchedMedia(partnerID, msg)
 
-		if msg.Sticker != nil {
-			stickerCfg := tgbotapi.StickerConfig{
-				BaseFile: tgbotapi.BaseFile{
-					BaseChat: tgbotapi.BaseChat{ChatID: partnerID},
-					File:     tgbotapi.FileID(msg.Sticker.FileID),
-				},
-			}
-			b.api.Send(stickerCfg)
-		} else if msg.Photo != nil {
-			photos := msg.Photo
-			photo := photos[len(photos)-1]
-			photoMsg := tgbotapi.NewPhoto(partnerID, tgbotapi.FileID(photo.FileID))
-			photoMsg.Caption = "🖼️ *Foto Sekali Lihat* (Akan terhapus dalam 10 detik)"
-			if msg.Caption != "" {
-				photoMsg.Caption += "\n\n💬 Stranger: " + msg.Caption
-			}
-			photoMsg.ParseMode = "Markdown"
-			sentMsg, _ := b.api.Send(photoMsg)
-
-			go func(chatID int64, messageID int) {
-				time.Sleep(10 * time.Second)
-				deleteMsg := tgbotapi.NewDeleteMessage(chatID, messageID)
-				b.api.Send(deleteMsg)
-			}(partnerID, sentMsg.MessageID)
-		} else if msg.Animation != nil {
-			anim := tgbotapi.NewAnimation(partnerID, tgbotapi.FileID(msg.Animation.FileID))
-			b.api.Send(anim)
-		}
-	} else if msg.Voice != nil {
+	case msg.Voice != nil:
 		voice := tgbotapi.NewVoice(partnerID, tgbotapi.FileID(msg.Voice.FileID))
 		b.api.Send(voice)
-	} else if msg.Video != nil {
+
+	case msg.Video != nil:
 		video := tgbotapi.NewVideo(partnerID, tgbotapi.FileID(msg.Video.FileID))
 		video.Caption = "📹 *Video Sekali Lihat* (Akan terhapus dalam 15 detik)"
 		if msg.Caption != "" {
@@ -276,18 +234,16 @@ func (b *Bot) handleChatMessage(msg *tgbotapi.Message) {
 		video.ParseMode = "Markdown"
 		sentMsg, _ := b.api.Send(video)
 
-		go func(chatID int64, messageID int) {
-			time.Sleep(15 * time.Second)
-			deleteMsg := tgbotapi.NewDeleteMessage(chatID, messageID)
-			b.api.Send(deleteMsg)
-		}(partnerID, sentMsg.MessageID)
-	} else if msg.Document != nil {
+		go b.deleteMessageAfterDelay(partnerID, sentMsg.MessageID, 15*time.Second)
+
+	case msg.Document != nil:
 		doc := tgbotapi.NewDocument(partnerID, tgbotapi.FileID(msg.Document.FileID))
 		if msg.Caption != "" {
 			doc.Caption = fmt.Sprintf("💬 Stranger: %s", msg.Caption)
 		}
 		b.api.Send(doc)
-	} else if msg.VideoNote != nil {
+
+	case msg.VideoNote != nil:
 		vnCfg := tgbotapi.VideoNoteConfig{
 			BaseFile: tgbotapi.BaseFile{
 				BaseChat: tgbotapi.BaseChat{ChatID: partnerID},
@@ -296,7 +252,59 @@ func (b *Bot) handleChatMessage(msg *tgbotapi.Message) {
 			Length: msg.VideoNote.Length,
 		}
 		b.api.Send(vnCfg)
-	} else {
+
+	default:
 		b.sendMessage(telegramID, "⚠️ Tipe pesan ini tidak didukung.", nil)
 	}
+}
+
+func (b *Bot) logSessionEvidence(sessionID, telegramID int64, msg *tgbotapi.Message) {
+	msgType := "text"
+	content := msg.Text
+	switch {
+	case msg.Sticker != nil:
+		msgType, content = "sticker", "Sticker:"+msg.Sticker.FileID
+	case msg.Photo != nil:
+		msgType, content = "photo", "Photo:"+msg.Photo[len(msg.Photo)-1].FileID
+	case msg.Voice != nil:
+		msgType, content = "voice", "Voice:"+msg.Voice.FileID
+	case msg.Video != nil:
+		msgType, content = "video", "Video:"+msg.Video.FileID
+	case msg.Animation != nil:
+		msgType, content = "animation", "Animation:"+msg.Animation.FileID
+	}
+	b.evidence.LogMessage(sessionID, telegramID, content, msgType)
+}
+
+func (b *Bot) forwardMatchedMedia(partnerID int64, msg *tgbotapi.Message) {
+	if msg.Sticker != nil {
+		stickerCfg := tgbotapi.StickerConfig{
+			BaseFile: tgbotapi.BaseFile{
+				BaseChat: tgbotapi.BaseChat{ChatID: partnerID},
+				File:     tgbotapi.FileID(msg.Sticker.FileID),
+			},
+		}
+		b.api.Send(stickerCfg)
+	} else if msg.Photo != nil {
+		photos := msg.Photo
+		photo := photos[len(photos)-1]
+		photoMsg := tgbotapi.NewPhoto(partnerID, tgbotapi.FileID(photo.FileID))
+		photoMsg.Caption = "🖼️ *Foto Sekali Lihat* (Akan terhapus dalam 10 detik)"
+		if msg.Caption != "" {
+			photoMsg.Caption += "\n\n💬 Stranger: " + msg.Caption
+		}
+		photoMsg.ParseMode = "Markdown"
+		sentMsg, _ := b.api.Send(photoMsg)
+
+		go b.deleteMessageAfterDelay(partnerID, sentMsg.MessageID, 10*time.Second)
+	} else if msg.Animation != nil {
+		anim := tgbotapi.NewAnimation(partnerID, tgbotapi.FileID(msg.Animation.FileID))
+		b.api.Send(anim)
+	}
+}
+
+func (b *Bot) deleteMessageAfterDelay(chatID int64, messageID int, delay time.Duration) {
+	time.Sleep(delay)
+	deleteMsg := tgbotapi.NewDeleteMessage(chatID, messageID)
+	b.api.Send(deleteMsg)
 }

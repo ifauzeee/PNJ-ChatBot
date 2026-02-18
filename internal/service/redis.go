@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"strings"
 	"time"
 
 	"github.com/pnj-anonymous-bot/internal/logger"
@@ -46,43 +45,43 @@ func (r *RedisService) GetClient() *redis.Client {
 	return r.client
 }
 
-func (r *RedisService) AddToQueue(telegramID int64, data string) error {
+func (r *RedisService) AddToQueue(telegramID int64, val interface{}) error {
 	key := "chat_queue"
-	val := fmt.Sprintf("%d:%s", telegramID, data)
-	return r.client.RPush(r.ctx, key, val).Err()
-}
+	trackKey := "chat_queue_track"
 
-func (r *RedisService) GetFromQueue() (string, error) {
-	key := "chat_queue"
-	return r.client.LPop(r.ctx, key).Result()
-}
-
-func (r *RedisService) RemoveFromQueue(telegramID int64) error {
-	key := "chat_queue"
-
-	items, err := r.client.LRange(r.ctx, key, 0, -1).Result()
+	raw, err := json.Marshal(val)
 	if err != nil {
 		return err
 	}
 
-	for _, item := range items {
-		if strings.HasPrefix(item, fmt.Sprintf("%d:", telegramID)) {
-			if err := r.client.LRem(r.ctx, key, 0, item).Err(); err != nil {
-				return err
-			}
-			continue
-		}
+	r.RemoveFromQueue(telegramID)
 
-		var queued struct {
-			TelegramID int64 `json:"telegram_id"`
-		}
-		if err := json.Unmarshal([]byte(item), &queued); err == nil && queued.TelegramID == telegramID {
-			if err := r.client.LRem(r.ctx, key, 0, item).Err(); err != nil {
-				return err
-			}
-		}
+	if err := r.client.RPush(r.ctx, key, raw).Err(); err != nil {
+		return err
 	}
-	return nil
+	return r.client.HSet(r.ctx, trackKey, fmt.Sprintf("%d", telegramID), raw).Err()
+}
+
+func (r *RedisService) GetFromQueue() ([]byte, error) {
+	key := "chat_queue"
+	return r.client.LPop(r.ctx, key).Bytes()
+}
+
+func (r *RedisService) RemoveFromQueue(telegramID int64) error {
+	key := "chat_queue"
+	trackKey := "chat_queue_track"
+	idStr := fmt.Sprintf("%d", telegramID)
+
+	raw, err := r.client.HGet(r.ctx, trackKey, idStr).Result()
+	if err == redis.Nil {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+
+	r.client.LRem(r.ctx, key, 0, raw)
+	return r.client.HDel(r.ctx, trackKey, idStr).Err()
 }
 
 func (r *RedisService) AllowPerMinute(action string, telegramID int64, limit int) (bool, int, error) {

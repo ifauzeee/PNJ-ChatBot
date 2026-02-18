@@ -178,12 +178,8 @@ func TestChatServiceProcessQueueTimeoutClearsFilters(t *testing.T) {
 		Year:       2021,
 		JoinedAt:   time.Now().Add(-2 * time.Minute).Unix(),
 	}
-	raw, err := json.Marshal(item)
-	if err != nil {
-		t.Fatalf("failed to marshal queue item: %v", err)
-	}
 
-	if err := chatSvc.redis.client.RPush(chatSvc.redis.ctx, "chat_queue", raw).Err(); err != nil {
+	if err := chatSvc.redis.AddToQueue(int64(3001), item); err != nil {
 		t.Fatalf("failed to enqueue queue item: %v", err)
 	}
 
