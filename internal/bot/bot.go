@@ -325,7 +325,7 @@ func (b *Bot) Start(ctx context.Context) error {
 		{Command: "broadcast", Description: "📢 (Admin) Broadcast pesan global"},
 	}
 	cmdCfg := tgbotapi.NewSetMyCommands(commands...)
-	if _, err := b.api.Send(cmdCfg); err != nil {
+	if _, err := b.api.Request(cmdCfg); err != nil {
 		logger.Warn("Failed to set bot commands", zap.Error(err))
 	}
 
@@ -469,7 +469,7 @@ func (b *Bot) handleCommand(msg *tgbotapi.Message) {
 		return
 	}
 
-	if command == "start" || command == "help" || command == "about" || command == "cancel" {
+	if command == "start" || command == "help" || command == "about" || command == "cancel" || command == "regist" {
 		handler(msg)
 		return
 	}

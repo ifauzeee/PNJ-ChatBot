@@ -1,10 +1,12 @@
 package email
 
 import (
+	"bytes"
 	"crypto/rand"
+	"encoding/json"
 	"fmt"
 	"math/big"
-	"net/smtp"
+	"net/http"
 	"strings"
 
 	"github.com/pnj-anonymous-bot/internal/config"
@@ -30,7 +32,7 @@ func GenerateOTP(length int) string {
 func (s *Sender) SendOTP(to, code string) error {
 	subject := "🔐 Kode Verifikasi PNJ Anonymous Bot"
 
-	body := fmt.Sprintf(`
+	htmlBody := fmt.Sprintf(`
 <!DOCTYPE html>
 <html>
 <head>
@@ -78,15 +80,64 @@ func (s *Sender) SendOTP(to, code string) error {
 </body>
 </html>`, code, s.cfg.OTPExpiryMinutes)
 
-	msg := fmt.Sprintf("From: %s\r\nTo: %s\r\nSubject: %s\r\nMIME-Version: 1.0\r\nContent-Type: text/html; charset=UTF-8\r\n\r\n%s",
-		s.cfg.SMTPFrom, to, subject, body)
+	type brevoRecipient struct {
+		Email string `json:"email"`
+	}
 
-	auth := smtp.PlainAuth("", s.cfg.SMTPUsername, s.cfg.SMTPPassword, s.cfg.SMTPHost)
+	type brevoSender struct {
+		Name  string `json:"name"`
+		Email string `json:"email"`
+	}
 
-	addr := fmt.Sprintf("%s:%d", s.cfg.SMTPHost, s.cfg.SMTPPort)
-	err := smtp.SendMail(addr, auth, s.cfg.SMTPUsername, []string{to}, []byte(msg))
+	type brevoRequest struct {
+		Sender      brevoSender      `json:"sender"`
+		To          []brevoRecipient `json:"to"`
+		Subject     string           `json:"subject"`
+		HTMLContent string           `json:"htmlContent"`
+	}
+
+	senderName := "PNJ Anonymous Bot"
+	senderEmail := s.cfg.SMTPUsername
+	if strings.Contains(s.cfg.SMTPFrom, "<") {
+		parts := strings.Split(s.cfg.SMTPFrom, "<")
+		senderName = strings.TrimSpace(parts[0])
+		senderEmail = strings.Trim(parts[1], "> ")
+	}
+
+	payload := brevoRequest{
+		Sender: brevoSender{
+			Name:  senderName,
+			Email: senderEmail,
+		},
+		To:          []brevoRecipient{{Email: to}},
+		Subject:     subject,
+		HTMLContent: htmlBody,
+	}
+
+	jsonPayload, err := json.Marshal(payload)
 	if err != nil {
-		return fmt.Errorf("failed to send email: %w", err)
+		return fmt.Errorf("failed to marshal payload: %w", err)
+	}
+
+	req, err := http.NewRequest("POST", "https://api.brevo.com/v3/smtp/email", bytes.NewBuffer(jsonPayload))
+	if err != nil {
+		return fmt.Errorf("failed to create request: %w", err)
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("api-key", s.cfg.BrevoAPIKey)
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return fmt.Errorf("failed to send request to Brevo: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		var errorRes map[string]interface{}
+		json.NewDecoder(resp.Body).Decode(&errorRes)
+		return fmt.Errorf("brevo api error (status %d): %v", resp.StatusCode, errorRes)
 	}
 
 	return nil
