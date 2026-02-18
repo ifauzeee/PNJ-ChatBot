@@ -15,7 +15,7 @@ func (d *DB) AddPointsAndExp(telegramID int64, points, exp int) (newLevel int, l
 
 	var current models.User
 	query, args, _ := d.Builder.Select("level", "exp", "points").From("users").Where("telegram_id = ?", telegramID).ToSql()
-	err = tx.QueryRow(d.PrepareQuery(query), args...).Scan(&current.Level, &current.Exp, &current.Points)
+	err = tx.QueryRow(query, args...).Scan(&current.Level, &current.Exp, &current.Points)
 	if err != nil {
 		return 0, false, err
 	}
@@ -42,7 +42,7 @@ func (d *DB) AddPointsAndExp(telegramID int64, points, exp int) (newLevel int, l
 		Set("updated_at", time.Now()).
 		Where("telegram_id = ?", telegramID).ToSql()
 
-	_, err = tx.Exec(d.PrepareQuery(updateQuery), updateArgs...)
+	_, err = tx.Exec(updateQuery, updateArgs...)
 	if err != nil {
 		return 0, false, err
 	}
@@ -60,7 +60,7 @@ func (d *DB) UpdateDailyStreak(telegramID int64) (newStreak int, streakBonus boo
 	var lastActive time.Time
 	var currentStreak int
 	query, args, _ := d.Builder.Select("last_active_at", "daily_streak").From("users").Where("telegram_id = ?", telegramID).ToSql()
-	err = tx.QueryRow(d.PrepareQuery(query), args...).Scan(&lastActive, &currentStreak)
+	err = tx.QueryRow(query, args...).Scan(&lastActive, &currentStreak)
 	if err != nil {
 		return 0, false, err
 	}
@@ -87,7 +87,7 @@ func (d *DB) UpdateDailyStreak(telegramID int64) (newStreak int, streakBonus boo
 		Set("updated_at", now).
 		Where("telegram_id = ?", telegramID).ToSql()
 
-	_, err = tx.Exec(d.PrepareQuery(updateQuery), updateArgs...)
+	_, err = tx.Exec(updateQuery, updateArgs...)
 	if err != nil {
 		return 0, false, err
 	}
@@ -97,12 +97,12 @@ func (d *DB) UpdateDailyStreak(telegramID int64) (newStreak int, streakBonus boo
 
 func (d *DB) GetLeaderboard(limit int) ([]models.User, error) {
 	var users []models.User
-	query, args, _ := d.Builder.Select("display_name", "level", "points", "daily_streak").
+	builder := d.Builder.Select("display_name", "level", "points", "daily_streak").
 		From("users").
 		Where("is_banned = FALSE AND is_verified = TRUE").
 		OrderBy("points DESC", "level DESC").
-		Limit(uint64(limit)).ToSql()
+		Limit(uint64(limit))
 
-	err := d.Select(&users, query, args...)
+	err := d.SelectBuilder(&users, builder)
 	return users, err
 }

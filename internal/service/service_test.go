@@ -28,10 +28,12 @@ func TestMain(m *testing.M) {
 func setupTestDB(t *testing.T) *database.DB {
 	t.Helper()
 
-	t.Setenv("DB_TYPE", "sqlite")
-	t.Setenv("DB_PATH", filepath.Join(t.TempDir(), "test.db"))
+	cfg := &config.Config{
+		DBType: "sqlite",
+		DBPath: filepath.Join(t.TempDir(), "test.db"),
+	}
 
-	db, err := database.New()
+	db, err := database.New(cfg)
 	if err != nil {
 		t.Fatalf("failed to create test db: %v", err)
 	}

@@ -5,16 +5,17 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/Masterminds/squirrel"
 	"github.com/pnj-anonymous-bot/internal/models"
 )
 
 func (d *DB) CreateConfession(authorID int64, content, department string) (*models.Confession, error) {
 	now := time.Now()
-	id, err := d.InsertGetID(
-		`INSERT INTO confessions (author_id, content, department, created_at) VALUES (?, ?, ?, ?)`,
-		"id",
-		authorID, content, department, now,
-	)
+	builder := d.Builder.Insert("confessions").
+		Columns("author_id", "content", "department", "created_at").
+		Values(authorID, content, department, now)
+
+	id, err := d.InsertGetID(builder, "id")
 	if err != nil {
 		return nil, fmt.Errorf("failed to create confession: %w", err)
 	}
@@ -31,11 +32,10 @@ func (d *DB) CreateConfession(authorID int64, content, department string) (*mode
 
 func (d *DB) GetConfession(id int64) (*models.Confession, error) {
 	c := &models.Confession{}
-	err := d.QueryRow(
-		`SELECT id, author_id, content, department, like_count, created_at 
-		 FROM confessions WHERE id = ?`, id,
-	).Scan(&c.ID, &c.AuthorID, &c.Content, &c.Department, &c.LikeCount, &c.CreatedAt)
+	builder := d.Builder.Select("id", "author_id", "content", "department", "like_count", "created_at").
+		From("confessions").Where("id = ?", id)
 
+	err := d.GetBuilder(c, builder)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -46,45 +46,45 @@ func (d *DB) GetConfession(id int64) (*models.Confession, error) {
 }
 
 func (d *DB) GetLatestConfessions(limit int) ([]*models.Confession, error) {
-	rows, err := d.Query(
-		`SELECT id, author_id, content, department, like_count, created_at 
-		 FROM confessions ORDER BY created_at DESC LIMIT ?`, limit,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get confessions: %w", err)
-	}
-	defer rows.Close()
+	builder := d.Builder.Select("id", "author_id", "content", "department", "like_count", "created_at").
+		From("confessions").OrderBy("created_at DESC").Limit(uint64(limit))
 
 	var confessions []*models.Confession
-	for rows.Next() {
-		c := &models.Confession{}
-		if err := rows.Scan(&c.ID, &c.AuthorID, &c.Content, &c.Department, &c.LikeCount, &c.CreatedAt); err != nil {
-			return nil, err
-		}
-		confessions = append(confessions, c)
+	err := d.SelectBuilder(&confessions, builder)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get confessions: %w", err)
 	}
 	return confessions, nil
 }
 
 func (d *DB) AddConfessionReaction(confessionID, telegramID int64, reaction string) error {
-	_, err := d.Exec(
-		`INSERT OR REPLACE INTO confession_reactions (confession_id, telegram_id, reaction, created_at) 
-		 VALUES (?, ?, ?, ?)`,
-		confessionID, telegramID, reaction, time.Now(),
-	)
+	builder := d.Builder.Insert("confession_reactions").
+		Columns("confession_id", "telegram_id", "reaction", "created_at").
+		Values(confessionID, telegramID, reaction, time.Now())
+
+	_, err := d.InsertReplace(builder, "confession_id, telegram_id")
 	if err != nil {
 		return err
 	}
 
-	_, err = d.Exec(
-		`UPDATE confessions SET like_count = (
-			SELECT COUNT(*) FROM confession_reactions WHERE confession_id = ?
-		) WHERE id = ?`,
-		confessionID, confessionID,
-	)
+	subQuery := d.Builder.Select("COUNT(*)").From("confession_reactions").Where("confession_id = ?", confessionID)
+	q, args, err := subQuery.ToSql()
+	if err != nil {
+		return err
+	}
+
+	updateBuilder := d.Builder.Update("confessions").
+		Set("like_count", squirrel.Expr("("+q+")", args...)).
+		Where("id = ?", confessionID)
+
+	_, err = d.ExecBuilder(updateBuilder)
+	if err != nil {
+		return err
+	}
 
 	var authorID int64
-	err = d.QueryRow(`SELECT author_id FROM confessions WHERE id = ?`, confessionID).Scan(&authorID)
+	authorQuery := d.Builder.Select("author_id").From("confessions").Where("id = ?", confessionID)
+	err = d.GetBuilder(&authorID, authorQuery)
 	if err == nil && authorID != telegramID {
 		d.IncrementUserKarma(authorID, 1)
 	}
@@ -94,57 +94,56 @@ func (d *DB) AddConfessionReaction(confessionID, telegramID int64, reaction stri
 
 func (d *DB) HasReacted(confessionID, telegramID int64) (bool, error) {
 	var count int
-	err := d.QueryRow(
-		`SELECT COUNT(*) FROM confession_reactions WHERE confession_id = ? AND telegram_id = ?`,
-		confessionID, telegramID,
-	).Scan(&count)
+	builder := d.Builder.Select("COUNT(*)").From("confession_reactions").
+		Where("confession_id = ? AND telegram_id = ?", confessionID, telegramID)
+
+	err := d.GetBuilder(&count, builder)
 	return count > 0, err
 }
 
 func (d *DB) GetConfessionReactionCounts(confessionID int64) (map[string]int, error) {
-	rows, err := d.Query(
-		`SELECT reaction, COUNT(*) as cnt FROM confession_reactions 
-		 WHERE confession_id = ? GROUP BY reaction`, confessionID,
-	)
+	builder := d.Builder.Select("reaction", "COUNT(*) as cnt").From("confession_reactions").
+		Where("confession_id = ?", confessionID).GroupBy("reaction")
+
+	var items []struct {
+		Reaction string `db:"reaction"`
+		Count    int    `db:"cnt"`
+	}
+	err := d.SelectBuilder(&items, builder)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
 
 	counts := make(map[string]int)
-	for rows.Next() {
-		var reaction string
-		var count int
-		if err := rows.Scan(&reaction, &count); err != nil {
-			return nil, err
-		}
-		counts[reaction] = count
+	for _, item := range items {
+		counts[item.Reaction] = item.Count
 	}
 	return counts, nil
 }
 
 func (d *DB) GetUserConfessionCount(telegramID int64, since time.Time) (int, error) {
 	var count int
-	err := d.QueryRow(
-		`SELECT COUNT(*) FROM confessions WHERE author_id = ? AND created_at > ?`,
-		telegramID, since,
-	).Scan(&count)
+	builder := d.Builder.Select("COUNT(*)").From("confessions").
+		Where("author_id = ? AND created_at > ?", telegramID, since)
+
+	err := d.GetBuilder(&count, builder)
 	return count, err
 }
 
 func (d *DB) GetTotalConfessions(telegramID int64) (int, error) {
 	var count int
-	err := d.QueryRow(
-		`SELECT COUNT(*) FROM confessions WHERE author_id = ?`, telegramID,
-	).Scan(&count)
+	builder := d.Builder.Select("COUNT(*)").From("confessions").Where("author_id = ?", telegramID)
+
+	err := d.GetBuilder(&count, builder)
 	return count, err
 }
 
 func (d *DB) CreateConfessionReply(confessionID, authorID int64, content string) error {
-	_, err := d.Exec(
-		`INSERT INTO confession_replies (confession_id, author_id, content, created_at) VALUES (?, ?, ?, ?)`,
-		confessionID, authorID, content, time.Now(),
-	)
+	builder := d.Builder.Insert("confession_replies").
+		Columns("confession_id", "author_id", "content", "created_at").
+		Values(confessionID, authorID, content, time.Now())
+
+	_, err := d.ExecBuilder(builder)
 	if err == nil {
 		d.IncrementUserKarma(authorID, 2)
 	}
@@ -152,29 +151,18 @@ func (d *DB) CreateConfessionReply(confessionID, authorID int64, content string)
 }
 
 func (d *DB) GetConfessionReplies(confessionID int64) ([]*models.ConfessionReply, error) {
-	rows, err := d.Query(
-		`SELECT id, confession_id, author_id, content, created_at 
-		 FROM confession_replies WHERE confession_id = ? ORDER BY created_at ASC`,
-		confessionID,
-	)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
+	builder := d.Builder.Select("id", "confession_id", "author_id", "content", "created_at").
+		From("confession_replies").Where("confession_id = ?", confessionID).OrderBy("created_at ASC")
 
 	var replies []*models.ConfessionReply
-	for rows.Next() {
-		r := &models.ConfessionReply{}
-		if err := rows.Scan(&r.ID, &r.ConfessionID, &r.AuthorID, &r.Content, &r.CreatedAt); err != nil {
-			return nil, err
-		}
-		replies = append(replies, r)
-	}
-	return replies, nil
+	err := d.SelectBuilder(&replies, builder)
+	return replies, err
 }
 
 func (d *DB) GetConfessionReplyCount(confessionID int64) (int, error) {
 	var count int
-	err := d.QueryRow(`SELECT COUNT(*) FROM confession_replies WHERE confession_id = ?`, confessionID).Scan(&count)
+	builder := d.Builder.Select("COUNT(*)").From("confession_replies").Where("confession_id = ?", confessionID)
+
+	err := d.GetBuilder(&count, builder)
 	return count, err
 }

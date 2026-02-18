@@ -3,13 +3,13 @@ package database
 import (
 	"database/sql"
 	"fmt"
-	"os"
 	"strings"
 	"time"
 
 	"github.com/Masterminds/squirrel"
 	"github.com/jmoiron/sqlx"
 	_ "github.com/lib/pq"
+	"github.com/pnj-anonymous-bot/internal/config"
 	"github.com/pnj-anonymous-bot/internal/logger"
 	"go.uber.org/zap"
 	_ "modernc.org/sqlite"
@@ -21,8 +21,8 @@ type DB struct {
 	Builder squirrel.StatementBuilderType
 }
 
-func New() (*DB, error) {
-	dbType := strings.ToLower(strings.TrimSpace(os.Getenv("DB_TYPE")))
+func New(cfg *config.Config) (*DB, error) {
+	dbType := strings.ToLower(strings.TrimSpace(cfg.DBType))
 	if dbType == "" {
 		dbType = "sqlite"
 	}
@@ -32,11 +32,11 @@ func New() (*DB, error) {
 
 	if dbType == "postgres" {
 		connStr := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=disable",
-			os.Getenv("DB_HOST"), os.Getenv("DB_PORT"), os.Getenv("DB_USER"),
-			os.Getenv("DB_PASSWORD"), os.Getenv("DB_NAME"))
+			cfg.DBHost, cfg.DBPort, cfg.DBUser,
+			cfg.DBPassword, cfg.DBName)
 		db, err = sqlx.Connect("postgres", connStr)
 	} else {
-		dbPath := os.Getenv("DB_PATH")
+		dbPath := cfg.DBPath
 		if dbPath == "" {
 			dbPath = "./data/pnj_anonymous.db"
 		}
@@ -79,75 +79,106 @@ func New() (*DB, error) {
 	return d, nil
 }
 
-func (d *DB) PrepareQuery(query string) string {
-	if strings.ToLower(d.DBType) == "postgres" {
-		if strings.Contains(query, "INSERT OR IGNORE INTO") {
-			query = strings.Replace(query, "INSERT OR IGNORE INTO", "INSERT INTO", 1)
-			if !strings.Contains(query, "ON CONFLICT") {
-				if strings.Contains(query, "cs_queue") {
-					query += " ON CONFLICT (user_id) DO NOTHING"
-				} else if strings.Contains(query, "blocked_users") {
-					query += " ON CONFLICT (user_id, blocked_id) DO NOTHING"
-				} else if strings.Contains(query, "room_members") {
-					query += " ON CONFLICT (room_id, telegram_id) DO NOTHING"
-				} else {
-					query += " ON CONFLICT DO NOTHING"
-				}
-			}
-		}
-		if strings.Contains(query, "INSERT OR REPLACE INTO") {
-			query = strings.Replace(query, "INSERT OR REPLACE INTO", "INSERT INTO", 1)
-			if !strings.Contains(query, "ON CONFLICT") {
-				if strings.Contains(query, "cs_sessions") {
-					query += " ON CONFLICT (user_id) DO UPDATE SET last_activity = EXCLUDED.last_activity"
-				} else if strings.Contains(query, "chat_queue") {
-					query += " ON CONFLICT (telegram_id) DO UPDATE SET joined_at = EXCLUDED.joined_at"
-				} else if strings.Contains(query, "confession_reactions") {
-					query += " ON CONFLICT (confession_id, telegram_id) DO NOTHING"
-				} else if strings.Contains(query, "users") {
-					query += " ON CONFLICT (telegram_id) DO NOTHING"
-				}
-			}
-		}
-
-		n := 1
-		for strings.Contains(query, "?") {
-			query = strings.Replace(query, "?", fmt.Sprintf("$%d", n), 1)
-			n++
-		}
-	}
-	return query
-}
-
 func (d *DB) Exec(query string, args ...interface{}) (sql.Result, error) {
-	return d.DB.Exec(d.PrepareQuery(query), args...)
+	return d.DB.Exec(query, args...)
 }
 
 func (d *DB) Query(query string, args ...interface{}) (*sql.Rows, error) {
-	return d.DB.Query(d.PrepareQuery(query), args...)
+	return d.DB.Query(query, args...)
 }
 
 func (d *DB) QueryRow(query string, args ...interface{}) *sql.Row {
-	return d.DB.QueryRow(d.PrepareQuery(query), args...)
+	return d.DB.QueryRow(query, args...)
 }
 
 func (d *DB) Get(dest interface{}, query string, args ...interface{}) error {
-	return d.DB.Get(dest, d.PrepareQuery(query), args...)
+	return d.DB.Get(dest, query, args...)
 }
 
 func (d *DB) Select(dest interface{}, query string, args ...interface{}) error {
-	return d.DB.Select(dest, d.PrepareQuery(query), args...)
+	return d.DB.Select(dest, query, args...)
 }
 
-func (d *DB) InsertGetID(query string, pkColumn string, args ...interface{}) (int64, error) {
-	q := d.PrepareQuery(query)
+func (d *DB) ExecBuilder(b squirrel.Sqlizer) (sql.Result, error) {
+	query, args, err := b.ToSql()
+	if err != nil {
+		return nil, err
+	}
+	return d.DB.Exec(query, args...)
+}
+
+func (d *DB) GetBuilder(dest interface{}, b squirrel.Sqlizer) error {
+	query, args, err := b.ToSql()
+	if err != nil {
+		return err
+	}
+	return d.DB.Get(dest, query, args...)
+}
+
+func (d *DB) SelectBuilder(dest interface{}, b squirrel.Sqlizer) error {
+	query, args, err := b.ToSql()
+	if err != nil {
+		return err
+	}
+	return d.DB.Select(dest, query, args...)
+}
+
+func (d *DB) InsertIgnore(builder squirrel.InsertBuilder, conflictCol string) (sql.Result, error) {
 	if d.DBType == "postgres" {
+		builder = builder.Suffix("ON CONFLICT (" + conflictCol + ") DO NOTHING")
+	} else {
+		query, args, err := builder.ToSql()
+		if err != nil {
+			return nil, err
+		}
+		query = strings.Replace(query, "INSERT INTO", "INSERT OR IGNORE INTO", 1)
+		return d.DB.Exec(query, args...)
+	}
+	return d.ExecBuilder(builder)
+}
+
+func (d *DB) InsertReplace(builder squirrel.InsertBuilder, conflictCol string, updateCols ...string) (sql.Result, error) {
+	if d.DBType == "postgres" {
+		var updateClause string
+		if len(updateCols) > 0 {
+			updateClause = "ON CONFLICT (" + conflictCol + ") DO UPDATE SET "
+			for i, col := range updateCols {
+				if i > 0 {
+					updateClause += ", "
+				}
+				updateClause += col + " = EXCLUDED." + col
+			}
+		} else {
+			updateClause = "ON CONFLICT (" + conflictCol + ") DO NOTHING"
+		}
+		builder = builder.Suffix(updateClause)
+	} else {
+		query, args, err := builder.ToSql()
+		if err != nil {
+			return nil, err
+		}
+		query = strings.Replace(query, "INSERT INTO", "INSERT OR REPLACE INTO", 1)
+		return d.DB.Exec(query, args...)
+	}
+	return d.ExecBuilder(builder)
+}
+
+func (d *DB) InsertGetID(builder squirrel.InsertBuilder, pkColumn string) (int64, error) {
+	if d.DBType == "postgres" {
+		query, args, err := builder.Suffix("RETURNING " + pkColumn).ToSql()
+		if err != nil {
+			return 0, err
+		}
 		var id int64
-		err := d.DB.QueryRow(q+" RETURNING "+pkColumn, args...).Scan(&id)
+		err = d.DB.QueryRow(query, args...).Scan(&id)
 		return id, err
 	}
 
-	res, err := d.DB.Exec(q, args...)
+	query, args, err := builder.ToSql()
+	if err != nil {
+		return 0, err
+	}
+	res, err := d.DB.Exec(query, args...)
 	if err != nil {
 		return 0, err
 	}

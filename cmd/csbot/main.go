@@ -19,7 +19,7 @@ func main() {
 		return
 	}
 
-	db, err := database.New()
+	db, err := database.New(cfg)
 	if err != nil {
 		logger.Fatal("❌ Failed to connect to database", zap.Error(err))
 	}

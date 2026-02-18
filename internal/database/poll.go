@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/Masterminds/squirrel"
 	"github.com/pnj-anonymous-bot/internal/models"
 )
 
@@ -15,23 +16,38 @@ func (d *DB) CreatePoll(authorID int64, question string, options []string) (int6
 	}
 	defer tx.Rollback()
 
+	builder := d.Builder.Insert("polls").
+		Columns("author_id", "question", "created_at").
+		Values(authorID, question, time.Now())
+
+	query, args, err := builder.ToSql()
+	if err != nil {
+		return 0, err
+	}
+
 	var pollID int64
-	query := d.PrepareQuery(`INSERT INTO polls (author_id, question, created_at) VALUES (?, ?, ?)`)
 	if d.DBType == "postgres" {
-		err = tx.QueryRow(query+" RETURNING id", authorID, question, time.Now()).Scan(&pollID)
+		err = tx.QueryRow(query+" RETURNING id", args...).Scan(&pollID)
 	} else {
-		res, errExec := tx.Exec(query, authorID, question, time.Now())
+		res, errExec := tx.Exec(query, args...)
 		if errExec == nil {
 			pollID, _ = res.LastInsertId()
 		}
 		err = errExec
 	}
+	if err != nil {
+		return 0, err
+	}
 
 	for _, opt := range options {
-		_, err := tx.Exec(
-			d.PrepareQuery(`INSERT INTO poll_options (poll_id, option_text) VALUES (?, ?)`),
-			pollID, opt,
-		)
+		optBuilder := d.Builder.Insert("poll_options").
+			Columns("poll_id", "option_text").
+			Values(pollID, opt)
+		optQuery, optArgs, err := optBuilder.ToSql()
+		if err != nil {
+			return 0, err
+		}
+		_, err = tx.Exec(optQuery, optArgs...)
 		if err != nil {
 			return 0, fmt.Errorf("failed to create poll option: %w", err)
 		}
@@ -42,11 +58,10 @@ func (d *DB) CreatePoll(authorID int64, question string, options []string) (int6
 
 func (d *DB) GetPoll(pollID int64) (*models.Poll, error) {
 	poll := &models.Poll{}
-	err := d.QueryRow(
-		`SELECT id, author_id, question, created_at FROM polls WHERE id = ?`,
-		pollID,
-	).Scan(&poll.ID, &poll.AuthorID, &poll.Question, &poll.CreatedAt)
+	builder := d.Builder.Select("id", "author_id", "question", "created_at").
+		From("polls").Where("id = ?", pollID)
 
+	err := d.GetBuilder(poll, builder)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -54,59 +69,31 @@ func (d *DB) GetPoll(pollID int64) (*models.Poll, error) {
 		return nil, err
 	}
 
-	rows, err := d.Query(
-		`SELECT id, poll_id, option_text, vote_count FROM poll_options WHERE poll_id = ?`,
-		pollID,
-	)
+	optBuilder := d.Builder.Select("id", "poll_id", "option_text", "vote_count").
+		From("poll_options").Where("poll_id = ?", pollID)
+
+	err = d.SelectBuilder(&poll.Options, optBuilder)
 	if err != nil {
 		return nil, err
-	}
-	defer rows.Close()
-
-	for rows.Next() {
-		opt := &models.PollOption{}
-		if err := rows.Scan(&opt.ID, &opt.PollID, &opt.OptionText, &opt.VoteCount); err != nil {
-			return nil, err
-		}
-		poll.Options = append(poll.Options, opt)
 	}
 
 	return poll, nil
 }
 
 func (d *DB) GetLatestPolls(limit int) ([]*models.Poll, error) {
-	rows, err := d.Query(
-		`SELECT id, author_id, question, created_at FROM polls ORDER BY created_at DESC LIMIT ?`,
-		limit,
-	)
+	builder := d.Builder.Select("id", "author_id", "question", "created_at").
+		From("polls").OrderBy("created_at DESC").Limit(uint64(limit))
+
+	var polls []*models.Poll
+	err := d.SelectBuilder(&polls, builder)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
-
-	var polls []*models.Poll
-	for rows.Next() {
-		p := &models.Poll{}
-		if err := rows.Scan(&p.ID, &p.AuthorID, &p.Question, &p.CreatedAt); err != nil {
-			return nil, err
-		}
-		polls = append(polls, p)
-	}
 
 	for _, p := range polls {
-		optRows, err := d.Query(
-			`SELECT id, poll_id, option_text, vote_count FROM poll_options WHERE poll_id = ?`,
-			p.ID,
-		)
-		if err == nil {
-			for optRows.Next() {
-				opt := &models.PollOption{}
-				if err := optRows.Scan(&opt.ID, &opt.PollID, &opt.OptionText, &opt.VoteCount); err == nil {
-					p.Options = append(p.Options, opt)
-				}
-			}
-			optRows.Close()
-		}
+		optBuilder := d.Builder.Select("id", "poll_id", "option_text", "vote_count").
+			From("poll_options").Where("poll_id = ?", p.ID)
+		_ = d.SelectBuilder(&p.Options, optBuilder)
 	}
 
 	return polls, nil
@@ -120,7 +107,11 @@ func (d *DB) VotePoll(pollID, telegramID, optionID int64) error {
 	defer tx.Rollback()
 
 	var exists bool
-	err = tx.QueryRow(d.PrepareQuery(`SELECT EXISTS(SELECT 1 FROM poll_votes WHERE poll_id = ? AND telegram_id = ?)`), pollID, telegramID).Scan(&exists)
+	existsQuery, existsArgs, _ := d.Builder.Select("1").Prefix("SELECT EXISTS(").
+		From("poll_votes").Where("poll_id = ? AND telegram_id = ?", pollID, telegramID).
+		Suffix(")").ToSql()
+
+	err = tx.QueryRow(existsQuery, existsArgs...).Scan(&exists)
 	if err != nil {
 		return err
 	}
@@ -129,7 +120,11 @@ func (d *DB) VotePoll(pollID, telegramID, optionID int64) error {
 	}
 
 	var optExists bool
-	err = tx.QueryRow(d.PrepareQuery(`SELECT EXISTS(SELECT 1 FROM poll_options WHERE id = ? AND poll_id = ?)`), optionID, pollID).Scan(&optExists)
+	optExistsQuery, optExistsArgs, _ := d.Builder.Select("1").Prefix("SELECT EXISTS(").
+		From("poll_options").Where("id = ? AND poll_id = ?", optionID, pollID).
+		Suffix(")").ToSql()
+
+	err = tx.QueryRow(optExistsQuery, optExistsArgs...).Scan(&optExists)
 	if err != nil {
 		return err
 	}
@@ -137,15 +132,22 @@ func (d *DB) VotePoll(pollID, telegramID, optionID int64) error {
 		return fmt.Errorf("opsi tidak valid untuk polling ini")
 	}
 
-	_, err = tx.Exec(
-		d.PrepareQuery(`INSERT INTO poll_votes (poll_id, telegram_id, option_id, created_at) VALUES (?, ?, ?, ?)`),
-		pollID, telegramID, optionID, time.Now(),
-	)
+	voteBuilder := d.Builder.Insert("poll_votes").
+		Columns("poll_id", "telegram_id", "option_id", "created_at").
+		Values(pollID, telegramID, optionID, time.Now())
+	voteQuery, voteArgs, _ := voteBuilder.ToSql()
+
+	_, err = tx.Exec(voteQuery, voteArgs...)
 	if err != nil {
 		return err
 	}
 
-	_, err = tx.Exec(d.PrepareQuery(`UPDATE poll_options SET vote_count = vote_count + 1 WHERE id = ?`), optionID)
+	updateBuilder := d.Builder.Update("poll_options").
+		Set("vote_count", squirrel.Expr("vote_count + 1")).
+		Where("id = ?", optionID)
+	updateQuery, updateArgs, _ := updateBuilder.ToSql()
+
+	_, err = tx.Exec(updateQuery, updateArgs...)
 	if err != nil {
 		return err
 	}
@@ -155,6 +157,7 @@ func (d *DB) VotePoll(pollID, telegramID, optionID int64) error {
 
 func (d *DB) GetPollVoteCount(pollID int64) (int, error) {
 	var count int
-	err := d.QueryRow(`SELECT COUNT(*) FROM poll_votes WHERE poll_id = ?`, pollID).Scan(&count)
+	builder := d.Builder.Select("COUNT(*)").From("poll_votes").Where("poll_id = ?", pollID)
+	err := d.GetBuilder(&count, builder)
 	return count, err
 }

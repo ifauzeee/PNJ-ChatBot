@@ -41,12 +41,11 @@ func (d *DB) StopChat(telegramID int64) (int64, error) {
 
 func (d *DB) CreateChatSession(user1ID, user2ID int64) (*models.ChatSession, error) {
 	now := time.Now()
-	query, args, _ := d.Builder.Insert("chat_sessions").
+	builder := d.Builder.Insert("chat_sessions").
 		Columns("user1_id", "user2_id", "is_active", "started_at").
-		Values(user1ID, user2ID, true, now).
-		ToSql()
+		Values(user1ID, user2ID, true, now)
 
-	id, err := d.InsertGetID(query, "id", args...)
+	id, err := d.InsertGetID(builder, "id")
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to create chat session: %w", err)
@@ -66,16 +65,12 @@ func (d *DB) CreateChatSession(user1ID, user2ID int64) (*models.ChatSession, err
 
 func (d *DB) GetActiveSession(telegramID int64) (*models.ChatSession, error) {
 	session := &models.ChatSession{}
-	query, args, err := d.Builder.Select("id", "user1_id", "user2_id", "is_active", "started_at", "ended_at").
+	builder := d.Builder.Select("id", "user1_id", "user2_id", "is_active", "started_at", "ended_at").
 		From("chat_sessions").
 		Where("(user1_id = ? OR user2_id = ?) AND is_active = TRUE", telegramID, telegramID).
-		OrderBy("started_at DESC").Limit(1).ToSql()
+		OrderBy("started_at DESC").Limit(1)
 
-	if err != nil {
-		return nil, err
-	}
-
-	err = d.Get(session, query, args...)
+	err := d.GetBuilder(session, builder)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -87,20 +82,20 @@ func (d *DB) GetActiveSession(telegramID int64) (*models.ChatSession, error) {
 }
 
 func (d *DB) EndChatSession(sessionID int64) error {
-	query, args, _ := d.Builder.Update("chat_sessions").
+	builder := d.Builder.Update("chat_sessions").
 		Set("is_active", false).
 		Set("ended_at", time.Now()).
-		Where("id = ?", sessionID).ToSql()
-	_, err := d.Exec(query, args...)
+		Where("id = ?", sessionID)
+	_, err := d.ExecBuilder(builder)
 	return err
 }
 
 func (d *DB) EndAllActiveSessions(telegramID int64) error {
-	query, args, _ := d.Builder.Update("chat_sessions").
+	builder := d.Builder.Update("chat_sessions").
 		Set("is_active", false).
 		Set("ended_at", time.Now()).
-		Where("(user1_id = ? OR user2_id = ?) AND is_active = TRUE", telegramID, telegramID).ToSql()
-	_, err := d.Exec(query, args...)
+		Where("(user1_id = ? OR user2_id = ?) AND is_active = TRUE", telegramID, telegramID)
+	_, err := d.ExecBuilder(builder)
 	return err
 }
 
@@ -121,8 +116,8 @@ func (d *DB) GetChatPartner(telegramID int64) (int64, error) {
 
 func (d *DB) GetTotalChatSessions(telegramID int64) (int, error) {
 	var count int
-	query, args, _ := d.Builder.Select("COUNT(*)").From("chat_sessions").
-		Where("user1_id = ? OR user2_id = ?", telegramID, telegramID).ToSql()
-	err := d.Get(&count, query, args...)
+	builder := d.Builder.Select("COUNT(*)").From("chat_sessions").
+		Where("user1_id = ? OR user2_id = ?", telegramID, telegramID)
+	err := d.GetBuilder(&count, builder)
 	return count, err
 }

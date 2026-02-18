@@ -34,7 +34,7 @@ func main() {
 	cfg := config.Load()
 
 	logger.Info("🗄️  Initializing database...")
-	db, err := database.New()
+	db, err := database.New(cfg)
 	if err != nil {
 		logger.Fatal("❌ Failed to initialize database", zap.Error(err))
 	}

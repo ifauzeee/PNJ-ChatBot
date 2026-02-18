@@ -9,10 +9,10 @@ import (
 
 func (d *DB) AwardAchievement(telegramID int64, key string) (bool, error) {
 	var exists bool
-	err := d.QueryRow(
-		`SELECT EXISTS(SELECT 1 FROM user_achievements WHERE telegram_id = ? AND achievement_key = ?)`,
-		telegramID, key,
-	).Scan(&exists)
+	existsBuilder := d.Builder.Select("1").Prefix("SELECT EXISTS(").
+		From("user_achievements").Where("telegram_id = ? AND achievement_key = ?", telegramID, key).
+		Suffix(")")
+	err := d.GetBuilder(&exists, existsBuilder)
 	if err != nil {
 		return false, err
 	}
@@ -20,10 +20,11 @@ func (d *DB) AwardAchievement(telegramID int64, key string) (bool, error) {
 		return false, nil
 	}
 
-	_, err = d.Exec(
-		`INSERT INTO user_achievements (telegram_id, achievement_key, earned_at) VALUES (?, ?, ?)`,
-		telegramID, key, time.Now(),
-	)
+	builder := d.Builder.Insert("user_achievements").
+		Columns("telegram_id", "achievement_key", "earned_at").
+		Values(telegramID, key, time.Now())
+
+	_, err = d.ExecBuilder(builder)
 	if err != nil {
 		return false, err
 	}
@@ -32,37 +33,25 @@ func (d *DB) AwardAchievement(telegramID int64, key string) (bool, error) {
 }
 
 func (d *DB) GetUserAchievements(telegramID int64) ([]*models.UserAchievement, error) {
-	rows, err := d.Query(
-		`SELECT telegram_id, achievement_key, earned_at FROM user_achievements WHERE telegram_id = ?`,
-		telegramID,
-	)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
 	var achievements []*models.UserAchievement
-	for rows.Next() {
-		ua := &models.UserAchievement{}
-		if err := rows.Scan(&ua.TelegramID, &ua.AchievementKey, &ua.EarnedAt); err != nil {
-			return nil, err
-		}
-		achievements = append(achievements, ua)
-	}
-	return achievements, nil
+	builder := d.Builder.Select("telegram_id", "achievement_key", "earned_at").
+		From("user_achievements").Where("telegram_id = ?", telegramID)
+
+	err := d.SelectBuilder(&achievements, builder)
+	return achievements, err
 }
 
 func (d *DB) GetUserPollCount(telegramID int64) (int, error) {
 	var count int
-	err := d.QueryRow(`SELECT COUNT(*) FROM polls WHERE author_id = ?`, telegramID).Scan(&count)
+	builder := d.Builder.Select("COUNT(*)").From("polls").Where("author_id = ?", telegramID)
+	err := d.GetBuilder(&count, builder)
 	return count, err
 }
 
 func (d *DB) GetUserMaxConfessionReactions(telegramID int64) (int, error) {
 	var maxReactions int
-	err := d.QueryRow(
-		`SELECT MAX(like_count) FROM confessions WHERE author_id = ?`, telegramID,
-	).Scan(&maxReactions)
+	builder := d.Builder.Select("COALESCE(MAX(like_count), 0)").From("confessions").Where("author_id = ?", telegramID)
+	err := d.GetBuilder(&maxReactions, builder)
 	if err == sql.ErrNoRows {
 		return 0, nil
 	}

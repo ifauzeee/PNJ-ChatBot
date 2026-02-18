@@ -24,7 +24,13 @@ type Config struct {
 	SMTPPassword string
 	SMTPFrom     string
 
-	DBPath string
+	DBType     string
+	DBPath     string
+	DBHost     string
+	DBPort     string
+	DBUser     string
+	DBPassword string
+	DBName     string
 
 	OTPLength        int
 	OTPExpiryMinutes int
@@ -58,7 +64,13 @@ func Load() *Config {
 		SMTPUsername:          getEnv("SMTP_USERNAME", ""),
 		SMTPPassword:          getEnv("SMTP_PASSWORD", ""),
 		SMTPFrom:              getEnv("SMTP_FROM", ""),
+		DBType:                getEnv("DB_TYPE", "sqlite"),
 		DBPath:                getEnv("DB_PATH", "./data/pnj_anonymous.db"),
+		DBHost:                getEnv("DB_HOST", "localhost"),
+		DBPort:                getEnv("DB_PORT", "5432"),
+		DBUser:                getEnv("DB_USER", "postgres"),
+		DBPassword:            getEnv("DB_PASSWORD", ""),
+		DBName:                getEnv("DB_NAME", "pnjbot"),
 		OTPLength:             getEnvInt("OTP_LENGTH", 6),
 		OTPExpiryMinutes:      getEnvInt("OTP_EXPIRY_MINUTES", 10),
 		MaxSearchPerMinute:    getEnvInt("MAX_SEARCH_PER_MINUTE", 5),
