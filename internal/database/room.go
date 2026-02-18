@@ -10,7 +10,7 @@ import (
 
 func (d *DB) GetActiveRooms() ([]*models.Room, error) {
 	subQuery := d.Builder.Select("COUNT(*)").From("room_members").Where("room_id = r.id")
-	q, args, _ := subQuery.ToSql()
+	q, _, _ := subQuery.ToSql()
 
 	builder := d.Builder.Select("r.id", "r.slug", "r.name", "r.description", "r.is_active", "r.created_at",
 		"("+q+") as member_count").
@@ -46,7 +46,7 @@ func (d *DB) CreateRoom(slug, name, description string) (*models.Room, error) {
 func (d *DB) GetRoomBySlug(slug string) (*models.Room, error) {
 	r := &models.Room{}
 	subQuery := d.Builder.Select("COUNT(*)").From("room_members").Where("room_id = rooms.id")
-	q, args, _ := subQuery.ToSql()
+	q, _, _ := subQuery.ToSql()
 
 	builder := d.Builder.Select("id", "slug", "name", "description", "is_active", "created_at",
 		"("+q+") as member_count").
@@ -71,7 +71,7 @@ func (d *DB) GetRoomBySlug(slug string) (*models.Room, error) {
 func (d *DB) GetRoomByID(id int64) (*models.Room, error) {
 	r := &models.Room{}
 	subQuery := d.Builder.Select("COUNT(*)").From("room_members").Where("room_id = rooms.id")
-	q, args, _ := subQuery.ToSql()
+	q, _, _ := subQuery.ToSql()
 
 	builder := d.Builder.Select("id", "slug", "name", "description", "is_active", "created_at",
 		"("+q+") as member_count").

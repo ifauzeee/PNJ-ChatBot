@@ -14,7 +14,7 @@ import (
 
 func main() {
 	logger.Init()
-	defer logger.Log.Sync()
+	defer func() { _ = logger.Log.Sync() }()
 
 	banner := `
 ╔══════════════════════════════════════════════════╗
