@@ -103,6 +103,7 @@ func (d *DB) VotePoll(pollID, telegramID, optionID int64) error {
 	tx, err := d.Begin()
 	if err != nil {
 		return err
+	}
 	defer func() { _ = tx.Rollback() }()
 
 	var exists bool

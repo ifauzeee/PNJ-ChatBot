@@ -211,7 +211,7 @@ func (b *Bot) handleChatMessage(msg *tgbotapi.Message) {
 			text = b.profanity.Clean(text)
 			b.sendMessage(telegramID, "⚠️ *Peringatan:* Pesan kamu mengandung kata-kata yang tidak pantas dan telah disensor.", nil)
 		}
-		b.sendMessage(partnerID, fmt.Sprintf("💬 *Stranger:*\n%s", escapeMarkdown(text)), nil)
+		b.sendMessage(partnerID, escapeMarkdown(text), nil)
 		b.processReward(telegramID, "chat_message")
 
 	case msg.Sticker != nil, msg.Photo != nil, msg.Animation != nil:
@@ -229,7 +229,7 @@ func (b *Bot) handleChatMessage(msg *tgbotapi.Message) {
 		video := tgbotapi.NewVideo(partnerID, tgbotapi.FileID(msg.Video.FileID))
 		video.Caption = "📹 *Video Sekali Lihat* (Akan terhapus dalam 15 detik)"
 		if msg.Caption != "" {
-			video.Caption += "\n\n💬 Stranger: " + msg.Caption
+			video.Caption += "\n\n" + msg.Caption
 		}
 		video.ParseMode = "Markdown"
 		sentMsg, _ := b.api.Send(video)
@@ -239,7 +239,7 @@ func (b *Bot) handleChatMessage(msg *tgbotapi.Message) {
 	case msg.Document != nil:
 		doc := tgbotapi.NewDocument(partnerID, tgbotapi.FileID(msg.Document.FileID))
 		if msg.Caption != "" {
-			doc.Caption = fmt.Sprintf("💬 Stranger: %s", msg.Caption)
+			doc.Caption = msg.Caption
 		}
 		b.api.Send(doc)
 
@@ -291,7 +291,7 @@ func (b *Bot) forwardMatchedMedia(partnerID int64, msg *tgbotapi.Message) {
 		photoMsg := tgbotapi.NewPhoto(partnerID, tgbotapi.FileID(photo.FileID))
 		photoMsg.Caption = "🖼️ *Foto Sekali Lihat* (Akan terhapus dalam 10 detik)"
 		if msg.Caption != "" {
-			photoMsg.Caption += "\n\n💬 Stranger: " + msg.Caption
+			photoMsg.Caption += "\n\n" + msg.Caption
 		}
 		photoMsg.ParseMode = "Markdown"
 		sentMsg, _ := b.api.Send(photoMsg)
