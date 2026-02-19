@@ -78,3 +78,16 @@ type Gamifier interface {
 	UpdateStreak(ctx context.Context, telegramID int64) (newStreak int, bonus bool, err error)
 	GetLeaderboard(ctx context.Context) ([]models.User, error)
 }
+
+type CSSessionManager interface {
+	GetTimedOutSessions(ctx context.Context, timeoutMinutes int) ([]int64, error)
+	GetActiveSessionByAdmin(ctx context.Context, adminID int64) (int64, error)
+	GetActiveSessionByUser(ctx context.Context, userID int64) (int64, error)
+	UpdateSessionActivity(ctx context.Context, userID int64) error
+	JoinQueue(ctx context.Context, userID int64) error
+	GetQueuePosition(ctx context.Context, userID int64) (int, error)
+	LeaveQueue(ctx context.Context, userID int64) error
+	CreateSession(ctx context.Context, userID, adminID int64) error
+	EndSession(ctx context.Context, userID int64) error
+	GetNextInQueue(ctx context.Context) (int64, error)
+}

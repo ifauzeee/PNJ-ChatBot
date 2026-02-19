@@ -9,6 +9,7 @@ import (
 	"github.com/pnj-anonymous-bot/internal/csbot"
 	"github.com/pnj-anonymous-bot/internal/database"
 	"github.com/pnj-anonymous-bot/internal/logger"
+	"github.com/pnj-anonymous-bot/internal/service"
 	"go.uber.org/zap"
 )
 
@@ -32,7 +33,8 @@ func main() {
 		logger.Fatal("❌ Failed to connect to database", zap.Error(err))
 	}
 
-	bot, err := csbot.New(cfg, db)
+	csService := service.NewCSService(db)
+	bot, err := csbot.New(cfg, csService)
 	if err != nil {
 		logger.Fatal("❌ Failed to initialize CS Bot", zap.Error(err))
 	}

@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"github.com/pnj-anonymous-bot/internal/config"
-	"github.com/pnj-anonymous-bot/internal/database"
 	"github.com/pnj-anonymous-bot/internal/logger"
+	"github.com/pnj-anonymous-bot/internal/service"
 	"go.uber.org/zap"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
@@ -17,10 +17,10 @@ import (
 type CSBot struct {
 	api *tgbotapi.BotAPI
 	cfg *config.Config
-	db  *database.DB
+	svc service.CSSessionManager
 }
 
-func New(cfg *config.Config, db *database.DB) (*CSBot, error) {
+func New(cfg *config.Config, svc service.CSSessionManager) (*CSBot, error) {
 	api, err := tgbotapi.NewBotAPI(cfg.CSBotToken)
 	if err != nil {
 		return nil, err
@@ -31,7 +31,7 @@ func New(cfg *config.Config, db *database.DB) (*CSBot, error) {
 	return &CSBot{
 		api: api,
 		cfg: cfg,
-		db:  db,
+		svc: svc,
 	}, nil
 }
 
@@ -80,7 +80,7 @@ func (b *CSBot) startTimeoutWorker(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			timedOutUsers, err := b.db.GetTimedOutCSSessions(ctx, 5)
+			timedOutUsers, err := b.svc.GetTimedOutSessions(ctx, 5)
 			if err != nil {
 				continue
 			}
@@ -97,9 +97,9 @@ func (b *CSBot) handleMessage(ctx context.Context, msg *tgbotapi.Message) {
 	telegramID := msg.From.ID
 
 	if telegramID == b.cfg.MaintenanceAccountID {
-		userID, _ := b.db.GetActiveCSSessionByAdmin(ctx, telegramID)
+		userID, _ := b.svc.GetActiveSessionByAdmin(ctx, telegramID)
 		if userID > 0 {
-			_ = b.db.UpdateCSSessionActivity(ctx, userID)
+			_ = b.svc.UpdateSessionActivity(ctx, userID)
 			if msg.IsCommand() && (msg.Command() == "stop" || msg.Command() == "end") {
 				b.handleStop(ctx, userID)
 				return
@@ -119,9 +119,9 @@ func (b *CSBot) handleMessage(ctx context.Context, msg *tgbotapi.Message) {
 		return
 	}
 
-	adminID, _ := b.db.GetActiveCSSessionByUser(ctx, telegramID)
+	adminID, _ := b.svc.GetActiveSessionByUser(ctx, telegramID)
 	if adminID > 0 {
-		_ = b.db.UpdateCSSessionActivity(ctx, telegramID)
+		_ = b.svc.UpdateSessionActivity(ctx, telegramID)
 		if msg.IsCommand() && msg.Command() == "stop" {
 			b.handleStop(ctx, telegramID)
 			return
@@ -160,12 +160,12 @@ Selamat datang di layanan bantuan resmi PNJ Anonymous Bot.
 }
 
 func (b *CSBot) handleChat(ctx context.Context, telegramID int64) {
-	activeUserID, _ := b.db.GetActiveCSSessionByAdmin(ctx, b.cfg.MaintenanceAccountID)
+	activeUserID, _ := b.svc.GetActiveSessionByAdmin(ctx, b.cfg.MaintenanceAccountID)
 	if activeUserID == 0 {
 		b.startSession(ctx, telegramID)
 	} else {
-		_ = b.db.JoinCSQueue(ctx, telegramID)
-		pos, _ := b.db.GetCSQueuePosition(ctx, telegramID)
+		_ = b.svc.JoinQueue(ctx, telegramID)
+		pos, _ := b.svc.GetQueuePosition(ctx, telegramID)
 		b.sendMessage(telegramID, fmt.Sprintf("⏳ <b>Agen sedang melayani pengguna lain.</b>\n\nKamu telah masuk ke dalam antrian. Posisi kamu saat ini: <b>#%d</b>.\nMohon tunggu sebentar, kami akan memberitahumu secara otomatis jika sudah terhubung.", pos))
 	}
 }
@@ -180,8 +180,8 @@ func (b *CSBot) startSession(ctx context.Context, userID int64) {
 		zap.Int64("user_id", userID),
 		zap.Int64("admin_id", b.cfg.MaintenanceAccountID),
 	)
-	_ = b.db.LeaveCSQueue(ctx, userID)
-	err := b.db.CreateCSSession(ctx, userID, b.cfg.MaintenanceAccountID)
+	_ = b.svc.LeaveQueue(ctx, userID)
+	err := b.svc.CreateSession(ctx, userID, b.cfg.MaintenanceAccountID)
 	if err != nil {
 		logger.Error("❌ Error creating CS session", zap.Error(err))
 		return
@@ -192,13 +192,13 @@ func (b *CSBot) startSession(ctx context.Context, userID int64) {
 }
 
 func (b *CSBot) endSession(ctx context.Context, userID int64, message string) {
-	_ = b.db.EndCSSession(ctx, userID)
+	_ = b.svc.EndSession(ctx, userID)
 	b.sendMessage(userID, message)
 	b.sendMessage(b.cfg.MaintenanceAccountID, fmt.Sprintf("🛑 <b>Sesi dengan user %d berakhir.</b>", userID))
 }
 
 func (b *CSBot) processQueue(ctx context.Context) {
-	nextUserID, err := b.db.GetNextInCSQueue(ctx)
+	nextUserID, err := b.svc.GetNextInQueue(ctx)
 	if err == nil && nextUserID > 0 {
 		b.startSession(ctx, nextUserID)
 	}
