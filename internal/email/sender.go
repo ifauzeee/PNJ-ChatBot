@@ -26,7 +26,12 @@ func GenerateOTP(length int) string {
 	code := make([]byte, length)
 	for i := 0; i < length; i++ {
 		num, _ := rand.Int(rand.Reader, big.NewInt(10))
-		code[i] = '0' + byte(num.Int64())
+		// G115 fix: num is [0, 9], so it's always safe to cast to byte
+		digit := num.Int64()
+		if digit < 0 || digit > 9 {
+			digit = 0
+		}
+		code[i] = '0' + byte(digit)
 	}
 	return string(code)
 }
@@ -126,7 +131,7 @@ func (s *Sender) SendOTP(ctx context.Context, to, code string) error {
 		return fmt.Errorf("failed to marshal payload: %w", err)
 	}
 
-	apiURL := "https://api.brevo.com/v3/smtp/email"
+	const apiURL = "https://api.brevo.com/v3/smtp/email"
 	req, err := http.NewRequestWithContext(ctx, "POST", apiURL, bytes.NewBuffer(jsonPayload))
 	if err != nil {
 		return fmt.Errorf("failed to create request: %w", err)
@@ -138,6 +143,7 @@ func (s *Sender) SendOTP(ctx context.Context, to, code string) error {
 	client := &http.Client{
 		Timeout: 30 * time.Second,
 	}
+	// #nosec G704 (SSRF): apiURL is a constant and payload is validated
 	resp, err := client.Do(req)
 	if err != nil {
 		return fmt.Errorf("failed to send request to Brevo: %w", err)

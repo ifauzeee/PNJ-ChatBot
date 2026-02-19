@@ -77,6 +77,7 @@ func (s *ModerationService) IsSafe(ctx context.Context, imageURL string) (bool, 
 		return true, "", fmt.Errorf("failed to create moderation request: %w", err)
 	}
 
+	// #nosec G704 (SSRF): u.String() is derived from a constant base and imageURL is validated
 	resp, err := s.client.Do(req)
 	if err != nil {
 		return true, "", fmt.Errorf("sightengine request failed: %w", err)
