@@ -261,6 +261,17 @@ func BackToMenuKeyboard() tgbotapi.InlineKeyboardMarkup {
 	)
 }
 
+func HelpKeyboard() tgbotapi.InlineKeyboardMarkup {
+	return tgbotapi.NewInlineKeyboardMarkup(
+		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonURL("🎧 Hubungi CS", "https://t.me/helperpnjbot"),
+		),
+		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData("🔙 Menu Utama", "menu:main"),
+		),
+	)
+}
+
 func PollVoteKeyboard(pollID int64, options []*models.PollOption) tgbotapi.InlineKeyboardMarkup {
 	var rows [][]tgbotapi.InlineKeyboardButton
 	for _, opt := range options {

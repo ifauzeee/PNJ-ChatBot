@@ -140,6 +140,10 @@ func (b *Bot) handleHelp(ctx context.Context, msg *tgbotapi.Message) {
 /about — Informasi hukum & privasi
 /cancel — Batalkan aksi
 
+🎧 <b>Bantuan CS</b>
+Butuh bantuan lebih lanjut atau ingin melaporkan kendala teknis?
+Hubungi Customer Service kami di: @helperpnjbot
+
 ⚖️ <b>Ketentuan Layanan:</b>
 1. Bot ini <b>UNOFFICIAL</b> (Bukan resmi dari PNJ).
 2. Pengguna wajib menjaga etika & kesopanan.
@@ -148,7 +152,7 @@ func (b *Bot) handleHelp(ctx context.Context, msg *tgbotapi.Message) {
 
 <i>Dibuat dengan ❤️ oleh Mahasiswa PNJ (Unofficial Project)</i>`
 
-	kb := BackToMenuKeyboard()
+	kb := HelpKeyboard()
 	b.sendMessageHTML(msg.From.ID, helpText, &kb)
 }
 
