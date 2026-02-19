@@ -2,8 +2,12 @@ package csbot
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"net/http"
+	"runtime"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/pnj-anonymous-bot/internal/config"
@@ -15,9 +19,11 @@ import (
 )
 
 type CSBot struct {
-	api *tgbotapi.BotAPI
-	cfg *config.Config
-	svc service.CSSessionManager
+	api        *tgbotapi.BotAPI
+	cfg        *config.Config
+	svc        service.CSSessionManager
+	startedAt  time.Time
+	background sync.WaitGroup
 }
 
 func New(cfg *config.Config, svc service.CSSessionManager) (*CSBot, error) {
@@ -29,9 +35,10 @@ func New(cfg *config.Config, svc service.CSSessionManager) (*CSBot, error) {
 	api.Debug = cfg.BotDebug
 
 	return &CSBot{
-		api: api,
-		cfg: cfg,
-		svc: svc,
+		api:       api,
+		cfg:       cfg,
+		svc:       svc,
+		startedAt: time.Now(),
 	}, nil
 }
 
@@ -43,6 +50,12 @@ func (b *CSBot) Start(ctx context.Context) {
 		zap.Int64("admin_id", b.cfg.MaintenanceAccountID),
 	)
 
+	b.background.Add(1)
+	go func() {
+		defer b.background.Done()
+		b.startHealthServer(ctx)
+	}()
+
 	go b.startTimeoutWorker(ctx)
 
 	u := tgbotapi.NewUpdate(0)
@@ -50,14 +63,15 @@ func (b *CSBot) Start(ctx context.Context) {
 
 	updates := b.api.GetUpdatesChan(u)
 
+mainLoop:
 	for {
 		select {
 		case <-ctx.Done():
 			logger.Info("Stopping CS Bot...")
-			return
+			break mainLoop
 		case update, ok := <-updates:
 			if !ok {
-				return
+				break mainLoop
 			}
 			if update.Message == nil {
 				continue
@@ -70,6 +84,10 @@ func (b *CSBot) Start(ctx context.Context) {
 			b.handleMessage(ctx, update.Message)
 		}
 	}
+
+	logger.Info("⏳ Waiting for background tasks to finish...")
+	b.background.Wait()
+	logger.Info("🛑 CS Bot shutdown completed")
 }
 
 func (b *CSBot) startTimeoutWorker(ctx context.Context) {
@@ -233,5 +251,61 @@ func (b *CSBot) sendMessage(chatID int64, text string) {
 			zap.Int64("chat_id", chatID),
 			zap.Error(err),
 		)
+	}
+}
+
+type HealthResponse struct {
+	Status     string `json:"status"`
+	Bot        string `json:"bot"`
+	Uptime     string `json:"uptime"`
+	GoVersion  string `json:"go_version"`
+	MemoryMB   uint64 `json:"memory_mb"`
+	Goroutines int    `json:"goroutines"`
+	Timestamp  string `json:"timestamp"`
+}
+
+func (b *CSBot) startHealthServer(ctx context.Context) {
+	mux := http.NewServeMux()
+
+	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+		var memStats runtime.MemStats
+		runtime.ReadMemStats(&memStats)
+
+		health := HealthResponse{
+			Status:     "ok",
+			Bot:        fmt.Sprintf("@%s (CS)", b.api.Self.UserName),
+			Uptime:     time.Since(b.startedAt).Round(time.Second).String(),
+			GoVersion:  runtime.Version(),
+			MemoryMB:   memStats.Alloc / 1024 / 1024,
+			Goroutines: runtime.NumGoroutine(),
+			Timestamp:  time.Now().Format(time.RFC3339),
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_ = json.NewEncoder(w).Encode(health)
+	})
+
+	server := &http.Server{
+		Addr:         ":8080",
+		Handler:      mux,
+		ReadTimeout:  5 * time.Second,
+		WriteTimeout: 10 * time.Second,
+		IdleTimeout:  30 * time.Second,
+	}
+
+	go func() {
+		<-ctx.Done()
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+
+		if err := server.Shutdown(shutdownCtx); err != nil {
+			logger.Warn("CS Health server shutdown error", zap.Error(err))
+		}
+	}()
+
+	logger.Info("🏥 CS Health check server listening on :8080")
+	if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		logger.Error("⚠️ CS Health check server error", zap.Error(err))
 	}
 }
