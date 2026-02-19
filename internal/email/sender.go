@@ -105,12 +105,17 @@ func (s *Sender) SendOTP(ctx context.Context, to, code string) error {
 		senderEmail = strings.Trim(parts[1], "> ")
 	}
 
+	toEmail := strings.TrimSpace(to)
+	if toEmail == "" {
+		return fmt.Errorf("recipient email is required")
+	}
+
 	payload := brevoRequest{
 		Sender: brevoSender{
 			Name:  senderName,
 			Email: senderEmail,
 		},
-		To:          []brevoRecipient{{Email: to}},
+		To:          []brevoRecipient{{Email: toEmail}},
 		Subject:     subject,
 		HTMLContent: htmlBody,
 	}

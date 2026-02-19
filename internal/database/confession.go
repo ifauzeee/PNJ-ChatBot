@@ -49,9 +49,9 @@ func (d *DB) GetConfession(ctx context.Context, id int64) (*models.Confession, e
 }
 
 func (d *DB) GetLatestConfessions(ctx context.Context, limit int) ([]*models.Confession, error) {
-	safeLimit := uint64(limit)
-	if limit < 0 {
-		safeLimit = 0
+	var safeLimit uint64
+	if limit > 0 {
+		safeLimit = uint64(limit)
 	}
 	builder := d.Builder.Select("id", "author_id", "content", "department", "like_count", "created_at").
 		From("confessions").OrderBy("created_at DESC").Limit(safeLimit)

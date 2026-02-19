@@ -56,7 +56,15 @@ func (s *ModerationService) IsSafe(ctx context.Context, imageURL string) (bool, 
 		return true, "", nil
 	}
 
-	u, _ := url.Parse("https://api.sightengine.com/1.0/check.json")
+	parsedURL, err := url.Parse(imageURL)
+	if err != nil || (parsedURL.Scheme != "http" && parsedURL.Scheme != "https") || parsedURL.Host == "" {
+		return true, "", fmt.Errorf("invalid image URL: %s", imageURL)
+	}
+
+	u, err := url.Parse("https://api.sightengine.com/1.0/check.json")
+	if err != nil {
+		return true, "", fmt.Errorf("failed to parse sightengine API URL: %w", err)
+	}
 	q := u.Query()
 	q.Set("models", "nudity-2.0,wad")
 	q.Set("api_user", s.apiUser)
