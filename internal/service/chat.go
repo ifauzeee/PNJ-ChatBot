@@ -70,13 +70,20 @@ func (s *ChatService) SearchPartner(ctx context.Context, telegramID int64, prefe
 
 		if s.isMatch(ctx, item, preferredDept, preferredGender, preferredYear) {
 
-			if err := s.redis.GetClient().LRem(ctx, queueKey, 1, raw).Err(); err != nil {
+			removed, err := s.redis.GetClient().LRem(ctx, queueKey, 1, raw).Result()
+			if err != nil {
 				logger.Warn("Failed to remove matched user from queue", zap.Error(err))
+				continue
+			}
+			if removed == 0 {
+				logger.Debug("Partner already taken by another user", zap.Int64("partner_id", item.TelegramID))
+				continue
 			}
 
-			_, err := s.db.CreateChatSession(ctx, telegramID, item.TelegramID)
-			if err != nil {
-				return 0, err
+			var sessErr error
+			_, sessErr = s.db.CreateChatSession(ctx, telegramID, item.TelegramID)
+			if sessErr != nil {
+				return 0, sessErr
 			}
 
 			if err := s.db.SetUserState(ctx, telegramID, models.StateInChat, ""); err != nil {
