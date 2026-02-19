@@ -44,3 +44,26 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
+
+  # ── Automated Backup Scheduler ──
+  scheduler:
+    image: mcuadros/ofelia:latest
+    container_name: pnj-scheduler
+    restart: always
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    labels:
+      - "ofelia.job-local.database-backup.schedule=@daily"
+      - "ofelia.job-local.database-backup.command=docker exec pnj-anonymous-bot /app/scripts/backup.sh"
+
+volumes:
+  pnj-bot-data:
+    driver: local
+  postgres-data:
+    driver: local
+  redis-data:
+    driver: local
+  prometheus-data:
+    driver: local
+  pnj-backups:
+    driver: local

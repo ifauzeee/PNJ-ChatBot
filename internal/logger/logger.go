@@ -6,6 +6,8 @@ import (
 
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
+
+	"github.com/getsentry/sentry-go"
 )
 
 var Log *zap.Logger
@@ -40,12 +42,34 @@ func Init() {
 	}
 }
 
+func InitSentry(dsn, env string) {
+	if dsn == "" {
+		return
+	}
+
+	err := sentry.Init(sentry.ClientOptions{
+		Dsn:              dsn,
+		Environment:      env,
+		TracesSampleRate: 0.2,
+		AttachStacktrace: true,
+	})
+	if err != nil {
+		Log.Error("failed to initialize sentry", zap.Error(err))
+		return
+	}
+
+	Log.Info("🚀 Sentry initialized", zap.String("env", env))
+}
+
 func Info(msg string, fields ...zap.Field) {
 	Log.Info(msg, fields...)
 }
 
 func Error(msg string, fields ...zap.Field) {
 	Log.Error(msg, fields...)
+
+	// Report to Sentry if initialized
+	sentry.CaptureMessage(msg)
 }
 
 func Fatal(msg string, fields ...zap.Field) {

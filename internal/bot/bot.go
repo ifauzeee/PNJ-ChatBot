@@ -22,6 +22,8 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.uber.org/zap"
 
+
+	"github.com/getsentry/sentry-go"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
@@ -154,21 +156,27 @@ func (b *Bot) registerHandlers() {
 }
 
 type HealthResponse struct {
-	Status     string `json:"status"`
-	Bot        string `json:"bot"`
-	Uptime     string `json:"uptime"`
-	GoVersion  string `json:"go_version"`
-	MemoryMB   uint64 `json:"memory_mb"`
-	Goroutines int    `json:"goroutines"`
-	Users      int    `json:"registered_users"`
-	Queue      int    `json:"queue_size"`
-	Timestamp  string `json:"timestamp"`
+	Status    string `json:"status"`
+	Database  string `json:"database"`
+	Redis     string `json:"redis"`
+	System    struct {
+		UptimeSeconds int64  `json:"uptime_seconds"`
+		HeapAlloc     uint64 `json:"heap_alloc"`
+		StackInUse    uint64 `json:"stack_in_use"`
+		Goroutines    int    `json:"goroutines"`
+	} `json:"system"`
+	Stats struct {
+		TotalUserOnline int `json:"total_user_online"`
+		TotalUserQueue  int `json:"total_user_queue"`
+	} `json:"stats"`
+	Timestamp string `json:"timestamp"`
 }
 
 func (b *Bot) startHealthServer(ctx context.Context) {
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
 		ctx := r.Context()
 		var memStats runtime.MemStats
 		runtime.ReadMemStats(&memStats)
@@ -176,17 +184,30 @@ func (b *Bot) startHealthServer(ctx context.Context) {
 		userCount, _ := b.db.GetOnlineUserCount(ctx)
 		queueCount, _ := b.chat.GetQueueCount(ctx)
 
-		health := HealthResponse{
-			Status:     "ok",
-			Bot:        fmt.Sprintf("@%s", b.api.Self.UserName),
-			Uptime:     time.Since(b.startedAt).Round(time.Second).String(),
-			GoVersion:  runtime.Version(),
-			MemoryMB:   memStats.Alloc / 1024 / 1024,
-			Goroutines: runtime.NumGoroutine(),
-			Users:      userCount,
-			Queue:      queueCount,
-			Timestamp:  time.Now().Format(time.RFC3339),
+		dbErr := b.db.PingContext(ctx)
+		redisErr := b.redisSvc.Ping(ctx)
+
+		dbStatus := "ok"
+		if dbErr != nil {
+			dbStatus = "error"
 		}
+		redisStatus := "ok"
+		if redisErr != nil {
+			redisStatus = "error"
+		}
+
+		health := HealthResponse{
+			Status:   "ok",
+			Database: dbStatus,
+			Redis:    redisStatus,
+			Timestamp: time.Now().Format(time.RFC3339),
+		}
+		health.System.UptimeSeconds = int64(time.Since(b.startedAt).Seconds())
+		health.System.HeapAlloc = memStats.Alloc
+		health.System.StackInUse = memStats.StackInuse
+		health.System.Goroutines = runtime.NumGoroutine()
+		health.Stats.TotalUserOnline = userCount
+		health.Stats.TotalUserQueue = queueCount
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
@@ -194,6 +215,7 @@ func (b *Bot) startHealthServer(ctx context.Context) {
 	})
 
 	mux.HandleFunc("/ready", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
 		w.Header().Set("Content-Type", "application/json")
 		ctx := r.Context()
 
@@ -449,6 +471,7 @@ func (b *Bot) handleUpdate(update tgbotapi.Update) {
 	defer func() {
 		if r := recover(); r != nil {
 			logger.Error("❌ Panic recovered", zap.Any("recover", r))
+			sentry.CurrentHub().Recover(r)
 		}
 		updateProcessDurationSeconds.WithLabelValues(userLabel, updateType).Observe(time.Since(startedAt).Seconds())
 	}()

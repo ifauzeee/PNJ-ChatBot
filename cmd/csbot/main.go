@@ -4,7 +4,9 @@ import (
 	"context"
 	"os/signal"
 	"syscall"
+	"time"
 
+	"github.com/getsentry/sentry-go"
 	"github.com/pnj-anonymous-bot/internal/config"
 	"github.com/pnj-anonymous-bot/internal/csbot"
 	"github.com/pnj-anonymous-bot/internal/database"
@@ -18,6 +20,9 @@ func main() {
 	defer func() { _ = logger.Log.Sync() }()
 
 	cfg := config.Load()
+
+	logger.InitSentry(cfg.SentryDSN, cfg.SentryEnv)
+	defer sentry.Flush(2 * time.Second)
 
 	if cfg.CSBotToken == "" {
 		logger.Warn("⚠️ CS_BOT_TOKEN is not set. CS Bot will not start.")

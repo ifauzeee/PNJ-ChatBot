@@ -4,7 +4,9 @@ import (
 	"context"
 	"os/signal"
 	"syscall"
+	"time"
 
+	"github.com/getsentry/sentry-go"
 	"github.com/pnj-anonymous-bot/internal/bot"
 	"github.com/pnj-anonymous-bot/internal/config"
 	"github.com/pnj-anonymous-bot/internal/database"
@@ -32,6 +34,10 @@ func main() {
 
 	logger.Info("📋 Loading configuration...")
 	cfg := config.Load()
+
+	logger.Info("🛡️ Initializing error tracking...")
+	logger.InitSentry(cfg.SentryDSN, cfg.SentryEnv)
+	defer sentry.Flush(2 * time.Second)
 
 	logger.Info("🗄️  Initializing database...")
 	db, err := database.New(cfg)

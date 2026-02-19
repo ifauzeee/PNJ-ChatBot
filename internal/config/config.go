@@ -47,6 +47,9 @@ type Config struct {
 	BrevoAPIKey          string
 	SightengineAPIUser   string
 	SightengineAPISecret string
+
+	SentryDSN string
+	SentryEnv string
 }
 
 func Load() *Config {
@@ -86,6 +89,8 @@ func Load() *Config {
 		BrevoAPIKey:           getEnv("BREVO_API_KEY", ""),
 		SightengineAPIUser:    getEnv("SIGHTENGINE_API_USER", ""),
 		SightengineAPISecret:  getEnv("SIGHTENGINE_API_SECRET", ""),
+		SentryDSN:             getEnv("SENTRY_DSN", ""),
+		SentryEnv:             getEnv("SENTRY_ENV", "production"),
 	}
 
 	if cfg.BotToken == "" {
