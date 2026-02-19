@@ -9,6 +9,7 @@ import (
 	"math/big"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/pnj-anonymous-bot/internal/config"
 )
@@ -134,7 +135,9 @@ func (s *Sender) SendOTP(ctx context.Context, to, code string) error {
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("api-key", s.cfg.BrevoAPIKey)
 
-	client := &http.Client{}
+	client := &http.Client{
+		Timeout: 30 * time.Second,
+	}
 	resp, err := client.Do(req)
 	if err != nil {
 		return fmt.Errorf("failed to send request to Brevo: %w", err)
