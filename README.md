@@ -60,7 +60,7 @@
 ### Prerequisites
 - Go 1.24+
 - Telegram Bot Token (dari [@BotFather](https://t.me/BotFather))
-- SMTP Email (Gmail dengan App Password)
+- Brevo API Key (untuk kirim OTP email)
 
 ### Setup
 
@@ -123,7 +123,7 @@ pnj-anonymous-bot/
 │   │   ├── chat.go              # Chat session operations
 │   │   ├── confession.go        # Confession CRUD
 │   │   └── report.go            # Reports, blocks, OTP
-│   ├── email/sender.go          # SMTP email sender
+│   ├── email/sender.go          # Brevo email sender
 │   ├── models/models.go         # Data models
 │   └── service/
 │       ├── auth.go              # Authentication logic
@@ -143,12 +143,12 @@ pnj-anonymous-bot/
 3. Ikuti instruksi untuk memberi nama bot
 4. Salin token yang diberikan ke `.env`
 
-## 📧 Setup Gmail SMTP
+## ?? Setup Brevo (OTP Email)
 
-1. Buka [Google Account Settings](https://myaccount.google.com)
-2. Aktifkan 2-Factor Authentication
-3. Buat App Password: Security → App Passwords
-4. Gunakan App Password di `.env`
+1. Buat akun di [Brevo](https://www.brevo.com/)
+2. Generate API Key dari menu SMTP & API
+3. Verifikasi sender email/domain kamu di Brevo
+4. Isi `BREVO_API_KEY`, `SMTP_USERNAME`, dan `SMTP_FROM` di `.env`
 
 
 ## 🐳 Docker Deployment
@@ -197,3 +197,6 @@ docker compose -f docker-compose.yml -f docker-compose.prod.yml up --build -d
 ## 📝 License
 
 [MIT License](LICENSE) — Politeknik Negeri Jakarta © 2026
+
+
+

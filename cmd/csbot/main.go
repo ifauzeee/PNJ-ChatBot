@@ -22,6 +22,10 @@ func main() {
 		logger.Warn("⚠️ CS_BOT_TOKEN is not set. CS Bot will not start.")
 		return
 	}
+	if cfg.MaintenanceAccountID == 0 {
+		logger.Warn("⚠️ MAINTENANCE_ID is not set or invalid. CS Bot will not start.")
+		return
+	}
 
 	db, err := database.New(cfg)
 	if err != nil {

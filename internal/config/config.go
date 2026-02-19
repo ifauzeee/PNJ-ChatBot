@@ -113,8 +113,11 @@ func (cfg *Config) validate() {
 		}
 	}
 
-	if cfg.BrevoAPIKey == "" && cfg.SMTPUsername == "" {
-		warnings = append(warnings, "No email sender configured (BREVO_API_KEY or SMTP_USERNAME). OTP emails will fail.")
+	if cfg.BrevoAPIKey == "" {
+		warnings = append(warnings, "BREVO_API_KEY is not set. OTP emails will fail.")
+	}
+	if cfg.SMTPUsername == "" {
+		warnings = append(warnings, "SMTP_USERNAME is not set. Brevo sender email may be invalid.")
 	}
 
 	if cfg.MaxSearchPerMinute <= 0 {
