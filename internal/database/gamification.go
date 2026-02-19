@@ -98,11 +98,15 @@ func (d *DB) UpdateDailyStreak(ctx context.Context, telegramID int64) (newStreak
 
 func (d *DB) GetLeaderboard(ctx context.Context, limit int) ([]models.User, error) {
 	var users []models.User
+	safeLimit := uint64(limit)
+	if limit < 0 {
+		safeLimit = 0
+	}
 	builder := d.Builder.Select("display_name", "level", "points", "daily_streak").
 		From("users").
 		Where("is_banned = FALSE AND is_verified = TRUE").
 		OrderBy("points DESC", "level DESC").
-		Limit(uint64(limit))
+		Limit(safeLimit)
 
 	err := d.SelectBuilderContext(ctx, &users, builder)
 	return users, err

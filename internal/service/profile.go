@@ -2,8 +2,9 @@ package service
 
 import (
 	"context"
+	"crypto/rand"
 	"fmt"
-	"math/rand"
+	"math/big"
 	"time"
 
 	"github.com/pnj-anonymous-bot/internal/config"
@@ -169,9 +170,16 @@ var (
 )
 
 func generateDisplayName() string {
-	r := rand.New(rand.NewSource(time.Now().UnixNano()))
-	adj := adjectives[r.Intn(len(adjectives))]
-	animal := animals[r.Intn(len(animals))]
-	num := r.Intn(999) + 1
+	adj := adjectives[getSecureRandomInt(len(adjectives))]
+	animal := animals[getSecureRandomInt(len(animals))]
+	num := getSecureRandomInt(999) + 1
 	return fmt.Sprintf("%s%s%d", adj, animal, num)
+}
+
+func getSecureRandomInt(max int) int {
+	if max <= 0 {
+		return 0
+	}
+	n, _ := rand.Int(rand.Reader, big.NewInt(int64(max)))
+	return int(n.Int64())
 }

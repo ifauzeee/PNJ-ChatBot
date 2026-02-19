@@ -210,11 +210,22 @@ func (b *Bot) startHealthServer(ctx context.Context) {
 			if redisErr != nil {
 				redisStatus = redisErr.Error()
 			}
-			fmt.Fprintf(w, `{"status":"not_ready","database":"%s","redis":"%s"}`, dbStatus, redisStatus)
+			resp := struct {
+				Status   string `json:"status"`
+				Database string `json:"database"`
+				Redis    string `json:"redis"`
+			}{
+				Status:   "not_ready",
+				Database: dbStatus,
+				Redis:    redisStatus,
+			}
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(resp)
 			return
 		}
+		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		fmt.Fprint(w, `{"status":"ready","database":"ok","redis":"ok"}`)
+		_, _ = w.Write([]byte(`{"status":"ready","database":"ok","redis":"ok"}`))
 	})
 
 	mux.Handle("/metrics", promhttp.Handler())

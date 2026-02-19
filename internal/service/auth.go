@@ -17,7 +17,7 @@ import (
 )
 
 type EmailSender interface {
-	SendOTP(to, code string) error
+	SendOTP(ctx context.Context, to, code string) error
 }
 
 type otpAttempt struct {
@@ -84,7 +84,7 @@ func (s *AuthService) InitiateVerification(ctx context.Context, telegramID int64
 		return fmt.Errorf("gagal mengupdate state: %w", err)
 	}
 
-	if err := s.email.SendOTP(emailAddr, code); err != nil {
+	if err := s.email.SendOTP(ctx, emailAddr, code); err != nil {
 		logger.Error("❌ Failed to send OTP email",
 			zap.String("email", emailAddr),
 			zap.Error(err),

@@ -2,8 +2,9 @@ package resilience
 
 import (
 	"context"
+	"crypto/rand"
 	"math"
-	"math/rand"
+	"math/big"
 	"time"
 )
 
@@ -83,7 +84,13 @@ func calculateBackoff(attempt int, baseDelay, maxDelay time.Duration) time.Durat
 		delay = maxDelay
 	}
 
-	jitter := time.Duration(rand.Int63n(int64(delay) / 2))
+	jitterRange := int64(delay) / 2
+	if jitterRange <= 0 {
+		jitterRange = 1
+	}
+	num, _ := rand.Int(rand.Reader, big.NewInt(jitterRange))
+	jitter := time.Duration(num.Int64())
+
 	delay = delay/2 + jitter
 	if delay < baseDelay {
 		delay = baseDelay

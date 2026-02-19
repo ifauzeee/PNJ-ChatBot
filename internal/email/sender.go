@@ -2,6 +2,7 @@ package email
 
 import (
 	"bytes"
+	"context"
 	"crypto/rand"
 	"encoding/json"
 	"fmt"
@@ -24,12 +25,12 @@ func GenerateOTP(length int) string {
 	code := make([]byte, length)
 	for i := 0; i < length; i++ {
 		num, _ := rand.Int(rand.Reader, big.NewInt(10))
-		code[i] = byte('0' + int32(num.Int64()))
+		code[i] = '0' + byte(num.Int64())
 	}
 	return string(code)
 }
 
-func (s *Sender) SendOTP(to, code string) error {
+func (s *Sender) SendOTP(ctx context.Context, to, code string) error {
 	subject := "🔐 Kode Verifikasi PNJ Anonymous Bot"
 
 	htmlBody := fmt.Sprintf(`
@@ -119,7 +120,8 @@ func (s *Sender) SendOTP(to, code string) error {
 		return fmt.Errorf("failed to marshal payload: %w", err)
 	}
 
-	req, err := http.NewRequest("POST", "https://api.brevo.com/v3/smtp/email", bytes.NewBuffer(jsonPayload))
+	apiURL := "https://api.brevo.com/v3/smtp/email"
+	req, err := http.NewRequestWithContext(ctx, "POST", apiURL, bytes.NewBuffer(jsonPayload))
 	if err != nil {
 		return fmt.Errorf("failed to create request: %w", err)
 	}

@@ -82,8 +82,12 @@ func (d *DB) GetPoll(ctx context.Context, pollID int64) (*models.Poll, error) {
 }
 
 func (d *DB) GetLatestPollsContext(ctx context.Context, limit int) ([]*models.Poll, error) {
+	safeLimit := uint64(limit)
+	if limit < 0 {
+		safeLimit = 0
+	}
 	builder := d.Builder.Select("id", "author_id", "question", "created_at").
-		From("polls").OrderBy("created_at DESC").Limit(uint64(limit))
+		From("polls").OrderBy("created_at DESC").Limit(safeLimit)
 
 	var polls []*models.Poll
 	err := d.SelectBuilderContext(ctx, &polls, builder)

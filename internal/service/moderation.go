@@ -56,10 +56,15 @@ func (s *ModerationService) IsSafe(ctx context.Context, imageURL string) (bool, 
 		return true, "", nil
 	}
 
-	apiURL := fmt.Sprintf("https://api.sightengine.com/1.0/check.json?models=nudity-2.0,wad&api_user=%s&api_secret=%s&url=%s",
-		s.apiUser, s.apiSecret, url.QueryEscape(imageURL))
+	u, _ := url.Parse("https://api.sightengine.com/1.0/check.json")
+	q := u.Query()
+	q.Set("models", "nudity-2.0,wad")
+	q.Set("api_user", s.apiUser)
+	q.Set("api_secret", s.apiSecret)
+	q.Set("url", imageURL)
+	u.RawQuery = q.Encode()
 
-	req, err := http.NewRequestWithContext(ctx, "GET", apiURL, nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", u.String(), nil)
 	if err != nil {
 		return true, "", fmt.Errorf("failed to create moderation request: %w", err)
 	}

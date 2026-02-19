@@ -13,7 +13,7 @@ type MockEmailSender struct {
 	Err      error
 }
 
-func (m *MockEmailSender) SendOTP(to, code string) error {
+func (m *MockEmailSender) SendOTP(ctx context.Context, to, code string) error {
 	m.LastTo = to
 	m.LastCode = code
 	return m.Err
