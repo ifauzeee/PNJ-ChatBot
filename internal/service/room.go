@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"fmt"
 	"regexp"
 	"strings"
@@ -19,22 +20,22 @@ func NewRoomService(db *database.DB) *RoomService {
 	return &RoomService{db: db}
 }
 
-func (s *RoomService) GetActiveRooms() ([]*models.Room, error) {
-	return s.db.GetActiveRooms()
+func (s *RoomService) GetActiveRooms(ctx context.Context) ([]*models.Room, error) {
+	return s.db.GetActiveRooms(ctx)
 }
 
-func (s *RoomService) CreateRoom(name, description string) (*models.Room, error) {
+func (s *RoomService) CreateRoom(ctx context.Context, name, description string) (*models.Room, error) {
 	slug := s.createSlug(name)
 	if slug == "" {
 		return nil, fmt.Errorf("nama circle tidak valid")
 	}
 
-	existing, _ := s.db.GetRoomBySlug(slug)
+	existing, _ := s.db.GetRoomBySlug(ctx, slug)
 	if existing != nil {
 		return nil, fmt.Errorf("circle dengan nama serupa sudah ada")
 	}
 
-	return s.db.CreateRoom(slug, name, description)
+	return s.db.CreateRoom(ctx, slug, name, description)
 }
 
 func (s *RoomService) createSlug(name string) string {
@@ -44,8 +45,8 @@ func (s *RoomService) createSlug(name string) string {
 	return strings.Trim(slug, "-")
 }
 
-func (s *RoomService) JoinRoom(telegramID int64, slug string) (*models.Room, error) {
-	room, err := s.db.GetRoomBySlug(slug)
+func (s *RoomService) JoinRoom(ctx context.Context, telegramID int64, slug string) (*models.Room, error) {
+	room, err := s.db.GetRoomBySlug(ctx, slug)
 	if err != nil {
 		return nil, err
 	}
@@ -53,14 +54,19 @@ func (s *RoomService) JoinRoom(telegramID int64, slug string) (*models.Room, err
 		return nil, fmt.Errorf("circle tidak ditemukan")
 	}
 
-	_ = s.db.RemoveMemberFromAllRooms(telegramID)
+	if err := s.db.RemoveMemberFromAllRooms(ctx, telegramID); err != nil {
+		logger.Warn("Failed to remove user from existing rooms before join",
+			zap.Int64("user_id", telegramID),
+			zap.Error(err),
+		)
+	}
 
-	err = s.db.AddRoomMember(room.ID, telegramID)
+	err = s.db.AddRoomMember(ctx, room.ID, telegramID)
 	if err != nil {
 		return nil, err
 	}
 
-	err = s.db.SetUserState(telegramID, models.StateInCircle, slug)
+	err = s.db.SetUserState(ctx, telegramID, models.StateInCircle, slug)
 	if err != nil {
 		return nil, err
 	}
@@ -72,13 +78,13 @@ func (s *RoomService) JoinRoom(telegramID int64, slug string) (*models.Room, err
 	return room, nil
 }
 
-func (s *RoomService) LeaveRoom(telegramID int64) error {
-	err := s.db.RemoveMemberFromAllRooms(telegramID)
+func (s *RoomService) LeaveRoom(ctx context.Context, telegramID int64) error {
+	err := s.db.RemoveMemberFromAllRooms(ctx, telegramID)
 	if err != nil {
 		return err
 	}
 
-	err = s.db.SetUserState(telegramID, models.StateNone, "")
+	err = s.db.SetUserState(ctx, telegramID, models.StateNone, "")
 	if err != nil {
 		return err
 	}
@@ -87,8 +93,8 @@ func (s *RoomService) LeaveRoom(telegramID int64) error {
 	return nil
 }
 
-func (s *RoomService) GetRoomMembers(telegramID int64) ([]int64, string, error) {
-	room, err := s.db.GetUserRoom(telegramID)
+func (s *RoomService) GetRoomMembers(ctx context.Context, telegramID int64) ([]int64, string, error) {
+	room, err := s.db.GetUserRoom(ctx, telegramID)
 	if err != nil {
 		return nil, "", err
 	}
@@ -96,7 +102,7 @@ func (s *RoomService) GetRoomMembers(telegramID int64) ([]int64, string, error) 
 		return nil, "", fmt.Errorf("kamu tidak sedang berada di circle mana pun")
 	}
 
-	members, err := s.db.GetRoomMembers(room.ID)
+	members, err := s.db.GetRoomMembers(ctx, room.ID)
 	if err != nil {
 		return nil, "", err
 	}
@@ -104,6 +110,6 @@ func (s *RoomService) GetRoomMembers(telegramID int64) ([]int64, string, error) 
 	return members, room.Name, nil
 }
 
-func (s *RoomService) GetUserRoom(telegramID int64) (*models.Room, error) {
-	return s.db.GetUserRoom(telegramID)
+func (s *RoomService) GetUserRoom(ctx context.Context, telegramID int64) (*models.Room, error) {
+	return s.db.GetUserRoom(ctx, telegramID)
 }

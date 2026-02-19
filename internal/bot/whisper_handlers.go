@@ -1,54 +1,60 @@
 package bot
 
 import (
+	"context"
 	"fmt"
 	"html"
 
+	"github.com/pnj-anonymous-bot/internal/metrics"
 	"github.com/pnj-anonymous-bot/internal/models"
+	"github.com/pnj-anonymous-bot/internal/validation"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
-func (b *Bot) handleWhisper(msg *tgbotapi.Message) {
+func (b *Bot) handleWhisper(ctx context.Context, msg *tgbotapi.Message) {
 	telegramID := msg.From.ID
 
 	kb := WhisperDeptKeyboard()
 	b.sendMessage(telegramID, `📢 *Whisper - Pesan Anonim ke Jurusan*
 
 ━━━━━━━━━━━━━━━━━━━
-Kirim pesan anonim ke semua mahasiswa di jurusan tertentu!
+Kiriman pesan anonim ke semua mahasiswa di jurusan tertentu!
 
 🎯 Pilih jurusan tujuan:`, &kb)
 }
 
-func (b *Bot) handleWhisperInput(msg *tgbotapi.Message, targetDept string) {
+func (b *Bot) handleWhisperInput(ctx context.Context, msg *tgbotapi.Message, targetDept string) {
 	telegramID := msg.From.ID
 
-	if msg.Text == "" || len(msg.Text) < 5 {
-		b.sendMessage(telegramID, "⚠️ Whisper terlalu pendek. Minimal 5 karakter.", nil)
+	if msg.Text == "" {
+		b.sendMessage(telegramID, "⚠️ Whisper harus berupa teks.", nil)
 		return
 	}
 
-	if len(msg.Text) > 500 {
-		b.sendMessage(telegramID, "⚠️ Whisper terlalu panjang. Maksimal 500 karakter.", nil)
+	text := validation.SanitizeText(msg.Text)
+	if errMsg := validation.ValidateText(text, validation.WhisperLimits); errMsg != "" {
+		b.sendMessage(telegramID, errMsg, nil)
 		return
 	}
 
-	content := msg.Text
+	content := text
 	if b.profanity.IsBad(content) {
 		content = b.profanity.Clean(content)
+		metrics.ProfanityFiltered.Inc()
 		b.sendMessage(telegramID, "⚠️ *Peringatan:* Whisper kamu mengandung kata-kata yang tidak pantas dan telah disensor.", nil)
 	}
 
-	targets, err := b.profile.SendWhisper(telegramID, targetDept, content)
+	targets, err := b.profile.SendWhisper(ctx, telegramID, targetDept, content)
 	if err != nil {
 		b.sendMessage(telegramID, fmt.Sprintf("⚠️ %s", err.Error()), nil)
 		return
 	}
 
-	_ = b.db.SetUserState(telegramID, models.StateNone, "")
+	logIfErr("set_state_none_after_whisper", b.db.SetUserState(ctx, telegramID, models.StateNone, ""))
+	metrics.WhispersTotal.Inc()
 
-	user, _ := b.db.GetUser(telegramID)
+	user, _ := b.db.GetUser(ctx, telegramID)
 	senderDept := ""
 	senderGender := ""
 	if user != nil {

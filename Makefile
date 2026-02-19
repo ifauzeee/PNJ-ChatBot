@@ -1,4 +1,4 @@
-.PHONY: build run clean tidy docker docker-prod docker-stop docker-logs docker-status docker-clean docker-backup lint test-coverage help security
+.PHONY: build run clean tidy docker docker-prod docker-stop docker-logs docker-status docker-clean docker-backup lint test-coverage help security quality-gate
 
 # Default target
 all: help
@@ -17,6 +17,7 @@ help:
 	@echo "  security        Run gosec security scan"
 	@echo "  test            Run all unit tests"
 	@echo "  test-coverage   Run tests and show coverage"
+	@echo "  quality-gate    Run all quality checks (pre-push)"
 	@echo ""
 	@echo "Docker Operations:"
 	@echo "  docker          Build & start (Dev)"
@@ -72,6 +73,10 @@ clean:
 # Tidy dependencies
 tidy:
 	go mod tidy
+
+# Quality gate (all checks)
+quality-gate:
+	./scripts/quality-gate.sh
 
 # ── Docker ────────────────────────────────────────────────
 

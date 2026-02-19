@@ -1,6 +1,7 @@
 package bot
 
 import (
+	"context"
 	"fmt"
 	"html"
 	"strconv"
@@ -9,7 +10,7 @@ import (
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
-func (b *Bot) handlePoll(msg *tgbotapi.Message) {
+func (b *Bot) handlePoll(ctx context.Context, msg *tgbotapi.Message) {
 	telegramID := msg.From.ID
 	args := msg.CommandArguments()
 
@@ -42,22 +43,22 @@ Contoh: <code>/poll Setuju gak harga parkir naik? | Setuju | Tidak Setuju</code>
 		return
 	}
 
-	pollID, err := b.db.CreatePoll(telegramID, question, options)
+	pollID, err := b.db.CreatePoll(ctx, telegramID, question, options)
 	if err != nil {
 		b.sendMessageHTML(telegramID, "❌ Gagal membuat polling.", nil)
 		return
 	}
 
-	_ = b.db.IncrementUserKarma(telegramID, 3)
-	b.checkAchievements(telegramID)
+	_ = b.db.IncrementUserKarma(ctx, telegramID, 3)
+	b.checkAchievements(ctx, telegramID)
 
 	b.sendMessageHTML(telegramID, fmt.Sprintf("✅ <b>Polling #%d berhasil dibuat!</b>\nSemua mahasiswa sekarang bisa memberikan suara secara anonim.", pollID), nil)
 }
 
-func (b *Bot) handleViewPolls(msg *tgbotapi.Message) {
+func (b *Bot) handleViewPolls(ctx context.Context, msg *tgbotapi.Message) {
 	telegramID := msg.From.ID
 
-	polls, err := b.db.GetLatestPolls(15)
+	polls, err := b.db.GetLatestPollsContext(ctx, 15)
 	if err != nil {
 		b.sendMessageHTML(telegramID, "❌ Gagal mengambil polling.", nil)
 		return
@@ -71,7 +72,7 @@ func (b *Bot) handleViewPolls(msg *tgbotapi.Message) {
 	header := "<b>🗳️ Daftar Polling Terbaru</b>\n━━━━━━━━━━━━━━━━━━━\n\n"
 
 	for _, p := range polls {
-		count, _ := b.db.GetPollVoteCount(p.ID)
+		count, _ := b.db.GetPollVoteCountContext(ctx, p.ID)
 		header += fmt.Sprintf("📊 <b>#%d</b>: %s\n👥 <i>%d Suara</i>\n\n", p.ID, html.EscapeString(p.Question), count)
 	}
 
@@ -80,7 +81,7 @@ func (b *Bot) handleViewPolls(msg *tgbotapi.Message) {
 	b.sendMessageHTML(telegramID, header, nil)
 }
 
-func (b *Bot) handleVotePoll(msg *tgbotapi.Message) {
+func (b *Bot) handleVotePoll(ctx context.Context, msg *tgbotapi.Message) {
 	telegramID := msg.From.ID
 	args := msg.CommandArguments()
 
@@ -95,7 +96,7 @@ func (b *Bot) handleVotePoll(msg *tgbotapi.Message) {
 		return
 	}
 
-	p, err := b.db.GetPoll(pollID)
+	p, err := b.db.GetPoll(ctx, pollID)
 	if err != nil || p == nil {
 		b.sendMessageHTML(telegramID, "❌ Polling tidak ditemukan.", nil)
 		return

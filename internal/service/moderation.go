@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -45,12 +46,12 @@ func NewModerationService(cfg *config.Config) *ModerationService {
 		apiSecret: cfg.SightengineAPISecret,
 		enabled:   cfg.SightengineAPIUser != "" && cfg.SightengineAPISecret != "",
 		client: &http.Client{
-			Timeout: 10 * time.Second,
+			Timeout: 15 * time.Second,
 		},
 	}
 }
 
-func (s *ModerationService) IsSafe(imageURL string) (bool, string, error) {
+func (s *ModerationService) IsSafe(ctx context.Context, imageURL string) (bool, string, error) {
 	if !s.enabled {
 		return true, "", nil
 	}
@@ -58,7 +59,12 @@ func (s *ModerationService) IsSafe(imageURL string) (bool, string, error) {
 	apiURL := fmt.Sprintf("https://api.sightengine.com/1.0/check.json?models=nudity-2.0,wad&api_user=%s&api_secret=%s&url=%s",
 		s.apiUser, s.apiSecret, url.QueryEscape(imageURL))
 
-	resp, err := s.client.Get(apiURL)
+	req, err := http.NewRequestWithContext(ctx, "GET", apiURL, nil)
+	if err != nil {
+		return true, "", fmt.Errorf("failed to create moderation request: %w", err)
+	}
+
+	resp, err := s.client.Do(req)
 	if err != nil {
 		return true, "", fmt.Errorf("sightengine request failed: %w", err)
 	}

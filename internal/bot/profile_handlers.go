@@ -1,6 +1,7 @@
 package bot
 
 import (
+	"context"
 	"fmt"
 	"html"
 
@@ -9,18 +10,18 @@ import (
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
-func (b *Bot) handleProfile(msg *tgbotapi.Message) {
+func (b *Bot) handleProfile(ctx context.Context, msg *tgbotapi.Message) {
 	telegramID := msg.From.ID
 
-	user, err := b.profile.GetProfile(telegramID)
+	user, err := b.profile.GetProfile(ctx, telegramID)
 	if err != nil || user == nil {
 		b.sendMessage(telegramID, "❌ Gagal memuat profil.", nil)
 		return
 	}
 
-	totalChats, totalConfessions, totalReactions, daysSince, _ := b.profile.GetStats(telegramID)
+	totalChats, totalConfessions, totalReactions, daysSince, _ := b.profile.GetStats(ctx, telegramID)
 
-	earned, _ := b.db.GetUserAchievements(telegramID)
+	earned, _ := b.db.GetUserAchievementsContext(ctx, telegramID)
 	badgeStr := ""
 	if len(earned) > 0 {
 		badgeStr = "\n🏆 <b>Lencana:</b> "
@@ -88,16 +89,16 @@ func (b *Bot) handleProfile(msg *tgbotapi.Message) {
 	b.sendMessageHTML(telegramID, profileText, &kb)
 }
 
-func (b *Bot) handleStats(msg *tgbotapi.Message) {
+func (b *Bot) handleStats(ctx context.Context, msg *tgbotapi.Message) {
 	telegramID := msg.From.ID
 
-	user, err := b.db.GetUser(telegramID)
+	user, err := b.db.GetUser(ctx, telegramID)
 	if err != nil || user == nil {
 		b.sendMessage(telegramID, "❌ Gagal memuat profil.", nil)
 		return
 	}
 
-	totalChats, totalConfessions, totalReactions, daysSince, err := b.profile.GetStats(telegramID)
+	totalChats, totalConfessions, totalReactions, daysSince, err := b.profile.GetStats(ctx, telegramID)
 	if err != nil {
 		b.sendMessage(telegramID, "❌ Gagal memuat statistik.", nil)
 		return
@@ -120,7 +121,8 @@ func (b *Bot) handleStats(msg *tgbotapi.Message) {
 	b.sendMessageHTML(telegramID, statsText, &kb)
 }
 
-func (b *Bot) handleEdit(msg *tgbotapi.Message) {
+func (b *Bot) handleEdit(ctx context.Context, msg *tgbotapi.Message) {
+	telegramID := msg.From.ID
 	kb := EditProfileKeyboard()
-	b.sendMessage(msg.From.ID, "✏️ *Edit Profil*\n\nApa yang ingin kamu ubah?", &kb)
+	b.sendMessage(telegramID, "✏️ *Edit Profil*\n\nApa yang ingin kamu ubah?", &kb)
 }

@@ -1,20 +1,23 @@
 package bot
 
 import (
+	"context"
 	"fmt"
 	"html"
 	"strconv"
 	"strings"
 
+	"github.com/pnj-anonymous-bot/internal/metrics"
 	"github.com/pnj-anonymous-bot/internal/models"
+	"github.com/pnj-anonymous-bot/internal/validation"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
-func (b *Bot) handleConfess(msg *tgbotapi.Message) {
+func (b *Bot) handleConfess(ctx context.Context, msg *tgbotapi.Message) {
 	telegramID := msg.From.ID
 
-	_ = b.db.SetUserState(telegramID, models.StateAwaitingConfess, "")
+	logIfErr("set_state_awaiting_confess", b.db.SetUserState(ctx, telegramID, models.StateAwaitingConfess, ""))
 
 	b.sendMessage(telegramID, `💬 *Tulis Confession Kamu*
 
@@ -27,7 +30,7 @@ Atau ketik /cancel untuk membatalkan.
 ⚠️ _Confession akan menampilkan jurusan kamu tapi TIDAK identitas kamu._`, nil)
 }
 
-func (b *Bot) handleConfessionInput(msg *tgbotapi.Message) {
+func (b *Bot) handleConfessionInput(ctx context.Context, msg *tgbotapi.Message) {
 	telegramID := msg.From.ID
 
 	if msg.Text == "" {
@@ -35,26 +38,29 @@ func (b *Bot) handleConfessionInput(msg *tgbotapi.Message) {
 		return
 	}
 
-	if len(msg.Text) < 10 {
-		b.sendMessage(telegramID, "⚠️ Confession terlalu pendek. Minimal 10 karakter.", nil)
+	text := validation.SanitizeText(msg.Text)
+	if errMsg := validation.ValidateText(text, validation.ConfessionLimits); errMsg != "" {
+		b.sendMessage(telegramID, errMsg, nil)
 		return
 	}
 
-	content := msg.Text
+	content := text
 	if b.profanity.IsBad(content) {
 		content = b.profanity.Clean(content)
+		metrics.ProfanityFiltered.Inc()
 		b.sendMessage(telegramID, "⚠️ *Peringatan:* Confession kamu mengandung kata-kata yang tidak pantas dan telah disensor.", nil)
 	}
 
-	confession, err := b.confession.CreateConfession(telegramID, content)
+	confession, err := b.confession.CreateConfession(ctx, telegramID, content)
 	if err != nil {
 		b.sendMessage(telegramID, fmt.Sprintf("⚠️ %s", err.Error()), nil)
 		return
 	}
 
-	_ = b.db.SetUserState(telegramID, models.StateNone, "")
-	b.checkAchievements(telegramID)
-	b.processReward(telegramID, "confession_created")
+	logIfErr("set_state_none_after_confess", b.db.SetUserState(ctx, telegramID, models.StateNone, ""))
+	metrics.ConfessionsTotal.Inc()
+	b.checkAchievements(ctx, telegramID)
+	b.processReward(ctx, telegramID, "confession_created")
 
 	b.sendMessage(telegramID, fmt.Sprintf(`✅ *Confession Terkirim!*
 
@@ -62,10 +68,10 @@ func (b *Bot) handleConfessionInput(msg *tgbotapi.Message) {
 Confession kamu sekarang bisa dilihat semua pengguna melalui /confessions.`, confession.ID), nil)
 }
 
-func (b *Bot) handleConfessions(msg *tgbotapi.Message) {
+func (b *Bot) handleConfessions(ctx context.Context, msg *tgbotapi.Message) {
 	telegramID := msg.From.ID
 
-	confessions, err := b.confession.GetLatestConfessions(10)
+	confessions, err := b.confession.GetLatestConfessions(ctx, 10)
 	if err != nil {
 		b.sendMessage(telegramID, "❌ Gagal mengambil confession.", nil)
 		return
@@ -80,8 +86,8 @@ func (b *Bot) handleConfessions(msg *tgbotapi.Message) {
 
 	for _, c := range confessions {
 		emoji := models.DepartmentEmoji(models.Department(c.Department))
-		counts, _ := b.confession.GetReactionCounts(c.ID)
-		replyCount, _ := b.db.GetConfessionReplyCount(c.ID)
+		counts, _ := b.confession.GetReactionCounts(ctx, c.ID)
+		replyCount, _ := b.db.GetConfessionReplyCount(ctx, c.ID)
 
 		reactionStr := ""
 		for r, count := range counts {
@@ -107,7 +113,7 @@ func (b *Bot) handleConfessions(msg *tgbotapi.Message) {
 	b.sendMessageHTML(telegramID, header, nil)
 }
 
-func (b *Bot) handleReact(msg *tgbotapi.Message) {
+func (b *Bot) handleReact(ctx context.Context, msg *tgbotapi.Message) {
 	telegramID := msg.From.ID
 	args := msg.CommandArguments()
 
@@ -129,7 +135,7 @@ func (b *Bot) handleReact(msg *tgbotapi.Message) {
 	}
 
 	reaction := parts[1]
-	err = b.confession.ReactToConfession(confessionID, telegramID, reaction)
+	err = b.confession.ReactToConfession(ctx, confessionID, telegramID, reaction)
 	if err != nil {
 		b.sendMessage(telegramID, fmt.Sprintf("❌ %s", err.Error()), nil)
 		return
@@ -138,7 +144,7 @@ func (b *Bot) handleReact(msg *tgbotapi.Message) {
 	b.sendMessage(telegramID, fmt.Sprintf("✅ Berhasil menambahkan reaksi %s ke confession #%d", reaction, confessionID), nil)
 }
 
-func (b *Bot) handleReply(msg *tgbotapi.Message) {
+func (b *Bot) handleReply(ctx context.Context, msg *tgbotapi.Message) {
 	telegramID := msg.From.ID
 	args := msg.CommandArguments()
 
@@ -165,24 +171,24 @@ func (b *Bot) handleReply(msg *tgbotapi.Message) {
 		b.sendMessage(telegramID, "⚠️ *Peringatan:* Balasan kamu mengandung kata-kata yang tidak pantas dan telah disensor.", nil)
 	}
 
-	err = b.db.CreateConfessionReply(confessionID, telegramID, content)
+	err = b.db.CreateConfessionReply(ctx, confessionID, telegramID, content)
 	if err != nil {
 		b.sendMessage(telegramID, "❌ Gagal mengirim balasan.", nil)
 		return
 	}
 
-	confession, _ := b.db.GetConfession(confessionID)
+	confession, _ := b.db.GetConfession(ctx, confessionID)
 	if confession != nil && confession.AuthorID != telegramID {
-		_ = b.db.IncrementUserKarma(confession.AuthorID, 1)
-		b.checkAchievements(confession.AuthorID)
+		logIfErr("increment_karma_reply", b.db.IncrementUserKarma(ctx, confession.AuthorID, 1))
+		b.checkAchievements(ctx, confession.AuthorID)
 	}
 
-	b.checkAchievements(telegramID)
+	b.checkAchievements(ctx, telegramID)
 
 	b.sendMessage(telegramID, fmt.Sprintf("✅ Berhasil membalas confession #%d", confessionID), nil)
 }
 
-func (b *Bot) handleViewReplies(msg *tgbotapi.Message) {
+func (b *Bot) handleViewReplies(ctx context.Context, msg *tgbotapi.Message) {
 	telegramID := msg.From.ID
 	args := msg.CommandArguments()
 
@@ -197,13 +203,13 @@ func (b *Bot) handleViewReplies(msg *tgbotapi.Message) {
 		return
 	}
 
-	confession, err := b.db.GetConfession(confessionID)
+	confession, err := b.db.GetConfession(ctx, confessionID)
 	if err != nil || confession == nil {
 		b.sendMessage(telegramID, "❌ Confession tidak ditemukan.", nil)
 		return
 	}
 
-	replies, err := b.db.GetConfessionReplies(confessionID)
+	replies, err := b.db.GetConfessionReplies(ctx, confessionID)
 	if err != nil {
 		b.sendMessage(telegramID, "❌ Gagal mengambil balasan.", nil)
 		return

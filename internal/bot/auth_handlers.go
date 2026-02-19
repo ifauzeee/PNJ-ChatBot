@@ -1,6 +1,7 @@
 package bot
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -9,10 +10,10 @@ import (
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
-func (b *Bot) handleRegist(msg *tgbotapi.Message) {
+func (b *Bot) handleRegist(ctx context.Context, msg *tgbotapi.Message) {
 	telegramID := msg.From.ID
 
-	user, err := b.auth.RegisterUser(telegramID)
+	user, err := b.auth.RegisterUser(ctx, telegramID)
 	if err != nil {
 		b.sendMessage(telegramID, "❌ Terjadi kesalahan. Coba lagi nanti.", nil)
 		return
@@ -44,7 +45,7 @@ Dengan menggunakan bot ini, Anda dianggap telah membaca dan menyetujui seluruh k
 	b.sendMessageHTML(telegramID, aboutText, &kb)
 }
 
-func (b *Bot) startEmailVerif(telegramID int64) {
+func (b *Bot) startEmailVerif(ctx context.Context, telegramID int64) {
 	registText := `🔐 <b>Verifikasi Email</b>
 ━━━━━━━━━━━━━━━━━━━
 Untuk menggunakan bot ini, kamu perlu verifikasi email PNJ kamu.
@@ -54,15 +55,15 @@ Contoh: <i>nama@mhsw.pnj.ac.id / nama@stu.pnj.ac.id</i>
 
 ⚠️ Pastikan email kamu benar dan aktif.`
 
-	_ = b.db.SetUserState(telegramID, models.StateAwaitingEmail, "")
+	_ = b.db.SetUserState(ctx, telegramID, models.StateAwaitingEmail, "")
 	b.sendMessageHTML(telegramID, registText, nil)
 }
 
-func (b *Bot) handleEmailInput(msg *tgbotapi.Message) {
+func (b *Bot) handleEmailInput(ctx context.Context, msg *tgbotapi.Message) {
 	telegramID := msg.From.ID
 	emailAddr := strings.TrimSpace(msg.Text)
 
-	err := b.auth.InitiateVerification(telegramID, emailAddr)
+	err := b.auth.InitiateVerification(ctx, telegramID, emailAddr)
 	if err != nil {
 		b.sendMessage(telegramID, fmt.Sprintf("⚠️ %s\n\n📧 Silakan ketik email PNJ kamu:", err.Error()), nil)
 		return
@@ -81,11 +82,11 @@ Email: <b>%s</b>
 		maskEmail(emailAddr), b.cfg.OTPExpiryMinutes), nil)
 }
 
-func (b *Bot) handleOTPInput(msg *tgbotapi.Message) {
+func (b *Bot) handleOTPInput(ctx context.Context, msg *tgbotapi.Message) {
 	telegramID := msg.From.ID
 	code := strings.TrimSpace(msg.Text)
 
-	valid, err := b.auth.VerifyOTP(telegramID, code)
+	valid, err := b.auth.VerifyOTP(ctx, telegramID, code)
 	if err != nil {
 		b.sendMessage(telegramID, "❌ Terjadi kesalahan. Coba lagi.", nil)
 		return

@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"testing"
 
 	"github.com/pnj-anonymous-bot/internal/config"
@@ -26,11 +27,12 @@ func TestAuthServiceVerificationFlow(t *testing.T) {
 	}
 	mockEmail := &MockEmailSender{}
 	authSvc := NewAuthService(db, mockEmail, cfg)
+	ctx := context.Background()
 
 	userID := int64(9001)
 	emailAddr := "test@mhsw.pnj.ac.id"
 
-	user, err := authSvc.RegisterUser(userID)
+	user, err := authSvc.RegisterUser(ctx, userID)
 	if err != nil {
 		t.Fatalf("RegisterUser failed: %v", err)
 	}
@@ -38,7 +40,7 @@ func TestAuthServiceVerificationFlow(t *testing.T) {
 		t.Errorf("Expected telegram ID %d, got %d", userID, user.TelegramID)
 	}
 
-	err = authSvc.InitiateVerification(userID, emailAddr)
+	err = authSvc.InitiateVerification(ctx, userID, emailAddr)
 	if err != nil {
 		t.Fatalf("InitiateVerification failed: %v", err)
 	}
@@ -49,7 +51,7 @@ func TestAuthServiceVerificationFlow(t *testing.T) {
 		t.Errorf("Expected 6-digit OTP, got %s", mockEmail.LastCode)
 	}
 
-	verified, err := authSvc.VerifyOTP(userID, mockEmail.LastCode)
+	verified, err := authSvc.VerifyOTP(ctx, userID, mockEmail.LastCode)
 	if err != nil {
 		t.Fatalf("VerifyOTP failed: %v", err)
 	}
@@ -57,7 +59,7 @@ func TestAuthServiceVerificationFlow(t *testing.T) {
 		t.Errorf("Expected OTP to be verified")
 	}
 
-	isVerified, _ := authSvc.IsVerified(userID)
+	isVerified, _ := authSvc.IsVerified(ctx, userID)
 	if !isVerified {
 		t.Errorf("User should be verified now")
 	}
@@ -67,12 +69,13 @@ func TestAuthServiceInvalidOTP(t *testing.T) {
 	db := setupTestDB(t)
 	cfg := &config.Config{OTPLength: 6, OTPExpiryMinutes: 10}
 	authSvc := NewAuthService(db, &MockEmailSender{}, cfg)
+	ctx := context.Background()
 
 	userID := int64(9002)
-	_, _ = authSvc.RegisterUser(userID)
-	_ = authSvc.InitiateVerification(userID, "wrong@mhsw.pnj.ac.id")
+	_, _ = authSvc.RegisterUser(ctx, userID)
+	_ = authSvc.InitiateVerification(ctx, userID, "wrong@mhsw.pnj.ac.id")
 
-	verified, err := authSvc.VerifyOTP(userID, "000000")
+	verified, err := authSvc.VerifyOTP(ctx, userID, "000000")
 	if err != nil {
 		t.Fatalf("VerifyOTP failed: %v", err)
 	}
@@ -84,8 +87,9 @@ func TestAuthServiceInvalidOTP(t *testing.T) {
 func TestAuthServiceRejectsInvalidDomain(t *testing.T) {
 	db := setupTestDB(t)
 	authSvc := NewAuthService(db, &MockEmailSender{}, &config.Config{})
+	ctx := context.Background()
 
-	err := authSvc.InitiateVerification(9003, "test@gmail.com")
+	err := authSvc.InitiateVerification(ctx, 9003, "test@gmail.com")
 	if err == nil {
 		t.Errorf("Expected error for invalid email domain")
 	}

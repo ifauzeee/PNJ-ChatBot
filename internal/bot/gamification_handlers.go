@@ -1,14 +1,15 @@
 package bot
 
 import (
+	"context"
 	"fmt"
 	"html"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
-func (b *Bot) processReward(telegramID int64, activity string) {
-	level, leveledUp, _, _, err := b.gamification.RewardActivity(telegramID, activity)
+func (b *Bot) processReward(ctx context.Context, telegramID int64, activity string) {
+	level, leveledUp, _, _, err := b.gamification.RewardActivity(ctx, telegramID, activity)
 	if err != nil {
 		return
 	}
@@ -22,10 +23,10 @@ Terus aktif chatting dan berinteraksi untuk mencapai level yang lebih tinggi!`, 
 	}
 }
 
-func (b *Bot) handleLeaderboard(msg *tgbotapi.Message) {
+func (b *Bot) handleLeaderboard(ctx context.Context, msg *tgbotapi.Message) {
 	telegramID := msg.From.ID
 
-	users, err := b.gamification.GetLeaderboard()
+	users, err := b.gamification.GetLeaderboard(ctx)
 	if err != nil {
 		b.sendMessage(telegramID, "❌ Gagal mengambil data leaderboard.", nil)
 		return

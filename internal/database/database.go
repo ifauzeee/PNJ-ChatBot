@@ -1,6 +1,7 @@
 package database
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"strings"
@@ -56,8 +57,12 @@ func New(cfg *config.Config) (*DB, error) {
 	db.SetConnMaxLifetime(time.Hour)
 
 	if dbType == "sqlite" {
-		_, _ = db.Exec("PRAGMA journal_mode=WAL")
-		_, _ = db.Exec("PRAGMA foreign_keys=ON")
+		if _, err := db.Exec("PRAGMA journal_mode=WAL"); err != nil {
+			logger.Warn("Failed to set PRAGMA journal_mode=WAL", zap.Error(err))
+		}
+		if _, err := db.Exec("PRAGMA foreign_keys=ON"); err != nil {
+			logger.Warn("Failed to set PRAGMA foreign_keys=ON", zap.Error(err))
+		}
 	}
 
 	builder := squirrel.StatementBuilder.PlaceholderFormat(squirrel.Question)
@@ -79,51 +84,43 @@ func New(cfg *config.Config) (*DB, error) {
 	return d, nil
 }
 
-func (d *DB) Exec(query string, args ...interface{}) (sql.Result, error) {
-	return d.DB.Exec(query, args...)
+func (d *DB) ExecContext(ctx context.Context, query string, args ...interface{}) (sql.Result, error) {
+	return d.DB.ExecContext(ctx, query, args...)
 }
 
-func (d *DB) Query(query string, args ...interface{}) (*sql.Rows, error) {
-	return d.DB.Query(query, args...)
+func (d *DB) GetContext(ctx context.Context, dest interface{}, query string, args ...interface{}) error {
+	return d.DB.GetContext(ctx, dest, query, args...)
 }
 
-func (d *DB) QueryRow(query string, args ...interface{}) *sql.Row {
-	return d.DB.QueryRow(query, args...)
+func (d *DB) SelectContext(ctx context.Context, dest interface{}, query string, args ...interface{}) error {
+	return d.DB.SelectContext(ctx, dest, query, args...)
 }
 
-func (d *DB) Get(dest interface{}, query string, args ...interface{}) error {
-	return d.DB.Get(dest, query, args...)
-}
-
-func (d *DB) Select(dest interface{}, query string, args ...interface{}) error {
-	return d.DB.Select(dest, query, args...)
-}
-
-func (d *DB) ExecBuilder(b squirrel.Sqlizer) (sql.Result, error) {
+func (d *DB) ExecBuilderContext(ctx context.Context, b squirrel.Sqlizer) (sql.Result, error) {
 	query, args, err := b.ToSql()
 	if err != nil {
 		return nil, err
 	}
-	return d.DB.Exec(query, args...)
+	return d.DB.ExecContext(ctx, query, args...)
 }
 
-func (d *DB) GetBuilder(dest interface{}, b squirrel.Sqlizer) error {
+func (d *DB) GetBuilderContext(ctx context.Context, dest interface{}, b squirrel.Sqlizer) error {
 	query, args, err := b.ToSql()
 	if err != nil {
 		return err
 	}
-	return d.DB.Get(dest, query, args...)
+	return d.DB.GetContext(ctx, dest, query, args...)
 }
 
-func (d *DB) SelectBuilder(dest interface{}, b squirrel.Sqlizer) error {
+func (d *DB) SelectBuilderContext(ctx context.Context, dest interface{}, b squirrel.Sqlizer) error {
 	query, args, err := b.ToSql()
 	if err != nil {
 		return err
 	}
-	return d.DB.Select(dest, query, args...)
+	return d.DB.SelectContext(ctx, dest, query, args...)
 }
 
-func (d *DB) InsertIgnore(builder squirrel.InsertBuilder, conflictCol string) (sql.Result, error) {
+func (d *DB) InsertIgnoreContext(ctx context.Context, builder squirrel.InsertBuilder, conflictCol string) (sql.Result, error) {
 	if d.DBType == "postgres" {
 		builder = builder.Suffix("ON CONFLICT (" + conflictCol + ") DO NOTHING")
 	} else {
@@ -132,12 +129,12 @@ func (d *DB) InsertIgnore(builder squirrel.InsertBuilder, conflictCol string) (s
 			return nil, err
 		}
 		query = strings.Replace(query, "INSERT INTO", "INSERT OR IGNORE INTO", 1)
-		return d.DB.Exec(query, args...)
+		return d.DB.ExecContext(ctx, query, args...)
 	}
-	return d.ExecBuilder(builder)
+	return d.ExecBuilderContext(ctx, builder)
 }
 
-func (d *DB) InsertReplace(builder squirrel.InsertBuilder, conflictCol string, updateCols ...string) (sql.Result, error) {
+func (d *DB) InsertReplaceContext(ctx context.Context, builder squirrel.InsertBuilder, conflictCol string, updateCols ...string) (sql.Result, error) {
 	if d.DBType == "postgres" {
 		var updateClause string
 		if len(updateCols) > 0 {
@@ -158,19 +155,19 @@ func (d *DB) InsertReplace(builder squirrel.InsertBuilder, conflictCol string, u
 			return nil, err
 		}
 		query = strings.Replace(query, "INSERT INTO", "INSERT OR REPLACE INTO", 1)
-		return d.DB.Exec(query, args...)
+		return d.DB.ExecContext(ctx, query, args...)
 	}
-	return d.ExecBuilder(builder)
+	return d.ExecBuilderContext(ctx, builder)
 }
 
-func (d *DB) InsertGetID(builder squirrel.InsertBuilder, pkColumn string) (int64, error) {
+func (d *DB) InsertGetIDContext(ctx context.Context, builder squirrel.InsertBuilder, pkColumn string) (int64, error) {
 	if d.DBType == "postgres" {
 		query, args, err := builder.Suffix("RETURNING " + pkColumn).ToSql()
 		if err != nil {
 			return 0, err
 		}
 		var id int64
-		err = d.DB.QueryRow(query, args...).Scan(&id)
+		err = d.DB.QueryRowContext(ctx, query, args...).Scan(&id)
 		return id, err
 	}
 
@@ -178,7 +175,7 @@ func (d *DB) InsertGetID(builder squirrel.InsertBuilder, pkColumn string) (int64
 	if err != nil {
 		return 0, err
 	}
-	res, err := d.DB.Exec(query, args...)
+	res, err := d.DB.ExecContext(ctx, query, args...)
 	if err != nil {
 		return 0, err
 	}

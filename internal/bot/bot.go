@@ -14,6 +14,7 @@ import (
 	"github.com/pnj-anonymous-bot/internal/database"
 	"github.com/pnj-anonymous-bot/internal/email"
 	"github.com/pnj-anonymous-bot/internal/logger"
+	"github.com/pnj-anonymous-bot/internal/metrics"
 	"github.com/pnj-anonymous-bot/internal/models"
 	"github.com/pnj-anonymous-bot/internal/service"
 	"github.com/prometheus/client_golang/prometheus"
@@ -52,6 +53,7 @@ type Bot struct {
 	api          *tgbotapi.BotAPI
 	cfg          *config.Config
 	db           *database.DB
+	redisSvc     *service.RedisService
 	auth         *service.AuthService
 	chat         *service.ChatService
 	confession   *service.ConfessionService
@@ -66,8 +68,8 @@ type Bot struct {
 	updateWG     sync.WaitGroup
 	background   sync.WaitGroup
 	userLocks    sync.Map
-	handlers     map[string]func(*tgbotapi.Message)
-	callbacks    map[string]func(int64, string, *tgbotapi.CallbackQuery)
+	handlers     map[string]func(context.Context, *tgbotapi.Message)
+	callbacks    map[string]func(context.Context, int64, string, *tgbotapi.CallbackQuery)
 }
 
 func New(cfg *config.Config, db *database.DB) (*Bot, error) {
@@ -85,6 +87,7 @@ func New(cfg *config.Config, db *database.DB) (*Bot, error) {
 		api:          api,
 		cfg:          cfg,
 		db:           db,
+		redisSvc:     redisSvc,
 		auth:         service.NewAuthService(db, emailSender, cfg),
 		chat:         service.NewChatService(db, redisSvc, cfg.MaxSearchPerMinute),
 		confession:   service.NewConfessionService(db, cfg),
@@ -104,7 +107,7 @@ func New(cfg *config.Config, db *database.DB) (*Bot, error) {
 }
 
 func (b *Bot) registerHandlers() {
-	b.handlers = map[string]func(*tgbotapi.Message){
+	b.handlers = map[string]func(context.Context, *tgbotapi.Message){
 		"start":        b.handleStart,
 		"regist":       b.handleRegist,
 		"help":         b.handleHelp,
@@ -134,7 +137,7 @@ func (b *Bot) registerHandlers() {
 		"leave_circle": b.handleLeaveCircle,
 	}
 
-	b.callbacks = map[string]func(int64, string, *tgbotapi.CallbackQuery){
+	b.callbacks = map[string]func(context.Context, int64, string, *tgbotapi.CallbackQuery){
 		"gender":  b.handleGenderCallback,
 		"dept":    b.handleDeptCallback,
 		"search":  b.handleSearchCallback,
@@ -166,11 +169,12 @@ func (b *Bot) startHealthServer(ctx context.Context) {
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
 		var memStats runtime.MemStats
 		runtime.ReadMemStats(&memStats)
 
-		userCount, _ := b.db.GetOnlineUserCount()
-		queueCount, _ := b.chat.GetQueueCount()
+		userCount, _ := b.db.GetOnlineUserCount(ctx)
+		queueCount, _ := b.chat.GetQueueCount(ctx)
 
 		health := HealthResponse{
 			Status:     "ok",
@@ -190,15 +194,27 @@ func (b *Bot) startHealthServer(ctx context.Context) {
 	})
 
 	mux.HandleFunc("/ready", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		ctx := r.Context()
 
-		if err := b.db.Ping(); err != nil {
+		dbErr := b.db.PingContext(ctx)
+		redisErr := b.redisSvc.Ping(ctx)
+
+		if dbErr != nil || redisErr != nil {
 			w.WriteHeader(http.StatusServiceUnavailable)
-			fmt.Fprintf(w, `{"status":"not_ready","error":"%s"}`, err.Error())
+			dbStatus := "ok"
+			redisStatus := "ok"
+			if dbErr != nil {
+				dbStatus = dbErr.Error()
+			}
+			if redisErr != nil {
+				redisStatus = redisErr.Error()
+			}
+			fmt.Fprintf(w, `{"status":"not_ready","database":"%s","redis":"%s"}`, dbStatus, redisStatus)
 			return
 		}
-		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		fmt.Fprint(w, `{"status":"ready"}`)
+		fmt.Fprint(w, `{"status":"ready","database":"ok","redis":"ok"}`)
 	})
 
 	mux.Handle("/metrics", promhttp.Handler())
@@ -235,7 +251,7 @@ func (b *Bot) startQueueWorker(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			updatedIDs, err := b.chat.ProcessQueueTimeout(60)
+			updatedIDs, err := b.chat.ProcessQueueTimeout(ctx, 60)
 			if err != nil {
 				logger.Error("⚠️ Queue worker error", zap.Error(err))
 				continue
@@ -358,16 +374,62 @@ intakeLoop:
 	}
 
 	close(b.updateQ)
-	b.updateWG.Wait()
+
+	logger.Info("⏳ Waiting for update workers to finish...",
+		zap.Int("remaining_updates", len(b.updateQ)),
+	)
+	workersDone := make(chan struct{})
+	go func() {
+		b.updateWG.Wait()
+		close(workersDone)
+	}()
+
+	shutdownTimeout := 30 * time.Second
+	select {
+	case <-workersDone:
+		logger.Info("✅ All update workers finished")
+	case <-time.After(shutdownTimeout):
+		logger.Warn("⚠️ Update workers did not finish within timeout",
+			zap.Duration("timeout", shutdownTimeout),
+		)
+	}
+
 	cancel()
-	b.background.Wait()
+	logger.Info("⏳ Waiting for background tasks to finish...")
+
+	bgDone := make(chan struct{})
+	go func() {
+		b.background.Wait()
+		close(bgDone)
+	}()
+
+	select {
+	case <-bgDone:
+		logger.Info("✅ All background tasks finished")
+	case <-time.After(10 * time.Second):
+		logger.Warn("⚠️ Background tasks did not finish within timeout")
+	}
+
 	updateQueueDepthGauge.Set(0)
-	logger.Info("Bot shutdown completed")
+
+	logger.Info("⏳ Closing external connections...")
+	if err := b.redisSvc.Close(); err != nil {
+		logger.Warn("Redis close error", zap.Error(err))
+	}
+	if err := b.db.Close(); err != nil {
+		logger.Warn("Database close error", zap.Error(err))
+	}
+	logger.Info("✅ External connections closed")
+
+	logger.Info("🛑 Bot shutdown completed")
 
 	return nil
 }
 
 func (b *Bot) handleUpdate(update tgbotapi.Update) {
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+
 	startedAt := time.Now()
 	userID, hasUser := b.extractUpdateUserID(update)
 	userLabel := updateMetricUserLabel(userID, hasUser)
@@ -391,19 +453,19 @@ func (b *Bot) handleUpdate(update tgbotapi.Update) {
 		}
 		defer lock.Unlock()
 
-		streak, bonus, errStreak := b.gamification.UpdateStreak(userID)
+		streak, bonus, errStreak := b.gamification.UpdateStreak(ctx, userID)
 		if errStreak == nil {
 			if bonus {
-				_, _, _, _, _ = b.gamification.RewardActivity(userID, "streak_bonus")
+				_, _, _, _, _ = b.gamification.RewardActivity(ctx, userID, "streak_bonus")
 				b.sendMessageHTML(userID, fmt.Sprintf("🔥 <b>STREAK LANJUT!</b>\nKamu sudah aktif selama <b>%d hari</b> berturut-turut! Dapat bonus poin dan exp.", streak), nil)
 			} else {
-				_, _, _, _, _ = b.gamification.RewardActivity(userID, "daily_login")
+				_, _, _, _, _ = b.gamification.RewardActivity(ctx, userID, "daily_login")
 			}
 		}
 	}
 
 	if update.CallbackQuery != nil {
-		b.handleCallback(update.CallbackQuery)
+		b.handleCallback(ctx, update.CallbackQuery)
 		return
 	}
 
@@ -412,11 +474,11 @@ func (b *Bot) handleUpdate(update tgbotapi.Update) {
 	}
 
 	if update.Message.IsCommand() {
-		b.handleCommand(update.Message)
+		b.handleCommand(ctx, update.Message)
 		return
 	}
 
-	b.handleMessage(update.Message)
+	b.handleMessage(ctx, update.Message)
 }
 
 func updateMetricUserLabel(userID int64, hasUser bool) string {
@@ -459,7 +521,7 @@ func (b *Bot) getUserLock(userID int64) *sync.Mutex {
 	return actual.(*sync.Mutex)
 }
 
-func (b *Bot) handleCommand(msg *tgbotapi.Message) {
+func (b *Bot) handleCommand(ctx context.Context, msg *tgbotapi.Message) {
 	telegramID := msg.From.ID
 	command := msg.Command()
 
@@ -469,27 +531,29 @@ func (b *Bot) handleCommand(msg *tgbotapi.Message) {
 		return
 	}
 
+	metrics.CommandsTotal.WithLabelValues(command).Inc()
+
 	if command == "start" || command == "help" || command == "about" || command == "cancel" || command == "regist" {
-		handler(msg)
+		handler(ctx, msg)
 		return
 	}
 
-	if !b.requireVerification(msg) {
+	if !b.requireVerification(ctx, msg) {
 		return
 	}
 
-	if banned, _ := b.auth.IsBanned(telegramID); banned {
+	if banned, _ := b.auth.IsBanned(ctx, telegramID); banned {
 		b.sendMessage(telegramID, "🚫 *Akun kamu telah di-banned.*\n\nKamu tidak bisa menggunakan bot ini karena telah melanggar aturan.", nil)
 		return
 	}
 
-	handler(msg)
+	handler(ctx, msg)
 }
 
-func (b *Bot) handleMessage(msg *tgbotapi.Message) {
+func (b *Bot) handleMessage(ctx context.Context, msg *tgbotapi.Message) {
 	telegramID := msg.From.ID
 
-	state, stateData, err := b.db.GetUserState(telegramID)
+	state, stateData, err := b.db.GetUserState(ctx, telegramID)
 	if err != nil {
 		logger.Error("Error getting user state", zap.Int64("telegram_id", telegramID), zap.Error(err))
 		return
@@ -497,23 +561,23 @@ func (b *Bot) handleMessage(msg *tgbotapi.Message) {
 
 	switch state {
 	case models.StateAwaitingEmail:
-		b.handleEmailInput(msg)
+		b.handleEmailInput(ctx, msg)
 	case models.StateAwaitingOTP:
-		b.handleOTPInput(msg)
+		b.handleOTPInput(ctx, msg)
 	case models.StateInChat:
-		b.handleChatMessage(msg)
+		b.handleChatMessage(ctx, msg)
 	case models.StateAwaitingConfess:
-		b.handleConfessionInput(msg)
+		b.handleConfessionInput(ctx, msg)
 	case models.StateAwaitingReport:
-		b.handleReportInput(msg)
+		b.handleReportInput(ctx, msg)
 	case models.StateAwaitingWhisper:
-		b.handleWhisperInput(msg, stateData)
+		b.handleWhisperInput(ctx, msg, stateData)
 	case models.StateInCircle:
-		b.handleCircleMessage(msg)
+		b.handleCircleMessage(ctx, msg)
 	case models.StateAwaitingRoomName:
-		b.handleRoomNameInput(msg)
+		b.handleRoomNameInput(ctx, msg)
 	case models.StateAwaitingRoomDesc:
-		b.handleRoomDescInput(msg)
+		b.handleRoomDescInput(ctx, msg)
 	default:
 
 		if msg.Text != "" {
@@ -522,22 +586,24 @@ func (b *Bot) handleMessage(msg *tgbotapi.Message) {
 	}
 }
 
-func (b *Bot) requireVerification(msg *tgbotapi.Message) bool {
+func (b *Bot) requireVerification(ctx context.Context, msg *tgbotapi.Message) bool {
 	telegramID := msg.From.ID
 
 	if b.cfg.MaintenanceAccountID != 0 && telegramID == b.cfg.MaintenanceAccountID {
-		user, _ := b.db.GetUser(telegramID)
+		user, _ := b.db.GetUser(ctx, telegramID)
 		if user == nil {
-			_, _ = b.db.CreateUser(telegramID)
-			_ = b.db.UpdateUserDisplayName(telegramID, "🛠️ Maintenance Account")
-			_ = b.db.UpdateUserVerified(telegramID, true)
-			_ = b.db.UpdateUserGender(telegramID, "Maintenance")
-			_ = b.db.UpdateUserDepartment(telegramID, "System")
+			if _, err := b.db.CreateUser(ctx, telegramID); err != nil {
+				logIfErr("create_maintenance_user", err)
+			}
+			logIfErr("set_maintenance_display_name", b.db.UpdateUserDisplayName(ctx, telegramID, "🛠️ Maintenance Account"))
+			logIfErr("set_maintenance_verified", b.db.UpdateUserVerified(ctx, telegramID, true))
+			logIfErr("set_maintenance_gender", b.db.UpdateUserGender(ctx, telegramID, "Maintenance"))
+			logIfErr("set_maintenance_dept", b.db.UpdateUserDepartment(ctx, telegramID, "System"))
 		}
 		return true
 	}
 
-	user, err := b.db.GetUser(telegramID)
+	user, err := b.db.GetUser(ctx, telegramID)
 	if err != nil || user == nil {
 		b.sendMessage(telegramID, "⚠️ Kamu belum terdaftar. Ketik /start untuk memulai.", nil)
 		return false

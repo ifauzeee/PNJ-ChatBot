@@ -1,6 +1,7 @@
 package csbot
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"time"
@@ -34,7 +35,7 @@ func New(cfg *config.Config, db *database.DB) (*CSBot, error) {
 	}, nil
 }
 
-func (b *CSBot) Start() {
+func (b *CSBot) Start(ctx context.Context) {
 	username := strings.Trim(b.api.Self.UserName, "\"")
 
 	logger.Info("🛠️ CS Bot authorized",
@@ -42,50 +43,65 @@ func (b *CSBot) Start() {
 		zap.Int64("admin_id", b.cfg.MaintenanceAccountID),
 	)
 
-	go b.startTimeoutWorker()
+	go b.startTimeoutWorker(ctx)
 
 	u := tgbotapi.NewUpdate(0)
 	u.Timeout = 60
 
 	updates := b.api.GetUpdatesChan(u)
 
-	for update := range updates {
-		if update.Message == nil {
-			continue
+	for {
+		select {
+		case <-ctx.Done():
+			logger.Info("Stopping CS Bot...")
+			return
+		case update, ok := <-updates:
+			if !ok {
+				return
+			}
+			if update.Message == nil {
+				continue
+			}
+			logger.Debug("CS update received",
+				zap.Int64("from_id", update.Message.From.ID),
+				zap.Bool("is_command", update.Message.IsCommand()),
+				zap.Int("text_len", len(update.Message.Text)),
+			)
+			b.handleMessage(ctx, update.Message)
 		}
-		logger.Debug("CS update received",
-			zap.Int64("from_id", update.Message.From.ID),
-			zap.Bool("is_command", update.Message.IsCommand()),
-			zap.Int("text_len", len(update.Message.Text)),
-		)
-		b.handleMessage(update.Message)
 	}
 }
 
-func (b *CSBot) startTimeoutWorker() {
+func (b *CSBot) startTimeoutWorker(ctx context.Context) {
 	ticker := time.NewTicker(1 * time.Minute)
-	for range ticker.C {
-		timedOutUsers, err := b.db.GetTimedOutCSSessions(5)
-		if err != nil {
-			continue
-		}
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			timedOutUsers, err := b.db.GetTimedOutCSSessions(ctx, 5)
+			if err != nil {
+				continue
+			}
 
-		for _, userID := range timedOutUsers {
-			b.endSession(userID, "⏰ <b>Sesi berakhir.</b> Tidak ada aktivitas selama 5 menit.")
-			b.processQueue()
+			for _, userID := range timedOutUsers {
+				b.endSession(ctx, userID, "⏰ <b>Sesi berakhir.</b> Tidak ada aktivitas selama 5 menit.")
+				b.processQueue(ctx)
+			}
 		}
 	}
 }
 
-func (b *CSBot) handleMessage(msg *tgbotapi.Message) {
+func (b *CSBot) handleMessage(ctx context.Context, msg *tgbotapi.Message) {
 	telegramID := msg.From.ID
 
 	if telegramID == b.cfg.MaintenanceAccountID {
-		userID, _ := b.db.GetActiveCSSessionByAdmin(telegramID)
+		userID, _ := b.db.GetActiveCSSessionByAdmin(ctx, telegramID)
 		if userID > 0 {
-			_ = b.db.UpdateCSSessionActivity(userID)
+			_ = b.db.UpdateCSSessionActivity(ctx, userID)
 			if msg.IsCommand() && (msg.Command() == "stop" || msg.Command() == "end") {
-				b.handleStop(userID)
+				b.handleStop(ctx, userID)
 				return
 			}
 			b.handleAdminReply(userID, msg)
@@ -103,11 +119,11 @@ func (b *CSBot) handleMessage(msg *tgbotapi.Message) {
 		return
 	}
 
-	adminID, _ := b.db.GetActiveCSSessionByUser(telegramID)
+	adminID, _ := b.db.GetActiveCSSessionByUser(ctx, telegramID)
 	if adminID > 0 {
-		_ = b.db.UpdateCSSessionActivity(telegramID)
+		_ = b.db.UpdateCSSessionActivity(ctx, telegramID)
 		if msg.IsCommand() && msg.Command() == "stop" {
-			b.handleStop(telegramID)
+			b.handleStop(ctx, telegramID)
 			return
 		}
 		b.forwardToAdmin(telegramID, adminID, msg)
@@ -119,7 +135,7 @@ func (b *CSBot) handleMessage(msg *tgbotapi.Message) {
 		case "start", "help":
 			b.handleHelp(telegramID)
 		case "chat":
-			b.handleChat(telegramID)
+			b.handleChat(ctx, telegramID)
 		default:
 			b.sendMessage(telegramID, "❓ Perintah tidak dikenal. Ketik /chat untuk bantuan.")
 		}
@@ -143,29 +159,29 @@ Selamat datang di layanan bantuan resmi PNJ Anonymous Bot.
 	b.sendMessage(telegramID, helpText)
 }
 
-func (b *CSBot) handleChat(telegramID int64) {
-	activeUserID, _ := b.db.GetActiveCSSessionByAdmin(b.cfg.MaintenanceAccountID)
+func (b *CSBot) handleChat(ctx context.Context, telegramID int64) {
+	activeUserID, _ := b.db.GetActiveCSSessionByAdmin(ctx, b.cfg.MaintenanceAccountID)
 	if activeUserID == 0 {
-		b.startSession(telegramID)
+		b.startSession(ctx, telegramID)
 	} else {
-		_ = b.db.JoinCSQueue(telegramID)
-		pos, _ := b.db.GetCSQueuePosition(telegramID)
+		_ = b.db.JoinCSQueue(ctx, telegramID)
+		pos, _ := b.db.GetCSQueuePosition(ctx, telegramID)
 		b.sendMessage(telegramID, fmt.Sprintf("⏳ <b>Agen sedang melayani pengguna lain.</b>\n\nKamu telah masuk ke dalam antrian. Posisi kamu saat ini: <b>#%d</b>.\nMohon tunggu sebentar, kami akan memberitahumu secara otomatis jika sudah terhubung.", pos))
 	}
 }
 
-func (b *CSBot) handleStop(userID int64) {
-	b.endSession(userID, "⏹️ <b>Sesi chat telah diakhiri.</b> Terima kasih telah menghubungi kami.")
-	b.processQueue()
+func (b *CSBot) handleStop(ctx context.Context, userID int64) {
+	b.endSession(ctx, userID, "⏹️ <b>Sesi chat telah diakhiri.</b> Terima kasih telah menghubungi kami.")
+	b.processQueue(ctx)
 }
 
-func (b *CSBot) startSession(userID int64) {
+func (b *CSBot) startSession(ctx context.Context, userID int64) {
 	logger.Info("🚀 Starting CS session",
 		zap.Int64("user_id", userID),
 		zap.Int64("admin_id", b.cfg.MaintenanceAccountID),
 	)
-	_ = b.db.LeaveCSQueue(userID)
-	err := b.db.CreateCSSession(userID, b.cfg.MaintenanceAccountID)
+	_ = b.db.LeaveCSQueue(ctx, userID)
+	err := b.db.CreateCSSession(ctx, userID, b.cfg.MaintenanceAccountID)
 	if err != nil {
 		logger.Error("❌ Error creating CS session", zap.Error(err))
 		return
@@ -175,16 +191,16 @@ func (b *CSBot) startSession(userID int64) {
 	b.sendMessage(b.cfg.MaintenanceAccountID, fmt.Sprintf("📩 <b>SESSION BARU</b>\nUser: %d\n\nSilakan balas pesan untuk memulai percakapan.", userID))
 }
 
-func (b *CSBot) endSession(userID int64, message string) {
-	_ = b.db.EndCSSession(userID)
+func (b *CSBot) endSession(ctx context.Context, userID int64, message string) {
+	_ = b.db.EndCSSession(ctx, userID)
 	b.sendMessage(userID, message)
 	b.sendMessage(b.cfg.MaintenanceAccountID, fmt.Sprintf("🛑 <b>Sesi dengan user %d berakhir.</b>", userID))
 }
 
-func (b *CSBot) processQueue() {
-	nextUserID, err := b.db.GetNextInCSQueue()
+func (b *CSBot) processQueue(ctx context.Context) {
+	nextUserID, err := b.db.GetNextInCSQueue(ctx)
 	if err == nil && nextUserID > 0 {
-		b.startSession(nextUserID)
+		b.startSession(ctx, nextUserID)
 	}
 }
 

@@ -24,7 +24,7 @@ func GenerateOTP(length int) string {
 	code := make([]byte, length)
 	for i := 0; i < length; i++ {
 		num, _ := rand.Int(rand.Reader, big.NewInt(10))
-		code[i] = byte('0' + int32(num.Int64())) // #nosec G115
+		code[i] = byte('0' + int32(num.Int64()))
 	}
 	return string(code)
 }
@@ -128,7 +128,7 @@ func (s *Sender) SendOTP(to, code string) error {
 	req.Header.Set("api-key", s.cfg.BrevoAPIKey)
 
 	client := &http.Client{}
-	resp, err := client.Do(req) // #nosec G704
+	resp, err := client.Do(req)
 	if err != nil {
 		return fmt.Errorf("failed to send request to Brevo: %w", err)
 	}

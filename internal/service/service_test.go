@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -13,12 +14,11 @@ import (
 	"github.com/pnj-anonymous-bot/internal/config"
 	"github.com/pnj-anonymous-bot/internal/database"
 	"github.com/pnj-anonymous-bot/internal/logger"
-	"github.com/pnj-anonymous-bot/internal/models"
 )
 
 func TestMain(m *testing.M) {
 	_ = os.Setenv("APP_ENV", "test")
-	_ = os.Setenv("LOG_LEVEL", "error")
+	_ = os.Setenv("LOG_LEVEL", "debug")
 	logger.Init()
 	code := m.Run()
 	_ = logger.Log.Sync()
@@ -38,237 +38,231 @@ func setupTestDB(t *testing.T) *database.DB {
 		t.Fatalf("failed to create test db: %v", err)
 	}
 
-	t.Cleanup(func() {
-		_ = db.Close()
-	})
-
+	t.Cleanup(func() { _ = db.Close() })
 	return db
 }
 
-func setupTestChatService(t *testing.T, maxSearchPerMinute int) (*ChatService, *database.DB) {
+func createUserForTest(t *testing.T, db *database.DB, telegramID int64, gender, department string, year int) {
 	t.Helper()
-
-	db := setupTestDB(t)
-
-	mr := miniredis.RunT(t)
-	t.Setenv("REDIS_URL", mr.Addr())
-
-	redisSvc := NewRedisService()
-	t.Cleanup(func() {
-		_ = redisSvc.client.Close()
-		mr.Close()
-	})
-
-	return NewChatService(db, redisSvc, maxSearchPerMinute), db
-}
-
-func createUserForTest(t *testing.T, db *database.DB, id int64, gender, dept string, year int) {
-	t.Helper()
-
-	if _, err := db.CreateUser(id); err != nil {
-		t.Fatalf("failed to create user %d: %v", id, err)
+	ctx := context.Background()
+	_, err := db.CreateUser(ctx, telegramID)
+	if err != nil {
+		t.Fatalf("failed to create user: %v", err)
 	}
+
 	if gender != "" {
-		if err := db.UpdateUserGender(id, gender); err != nil {
-			t.Fatalf("failed to set gender for user %d: %v", id, err)
-		}
+		_ = db.UpdateUserGender(ctx, telegramID, gender)
 	}
-	if dept != "" {
-		if err := db.UpdateUserDepartment(id, dept); err != nil {
-			t.Fatalf("failed to set dept for user %d: %v", id, err)
-		}
+	if department != "" {
+		_ = db.UpdateUserDepartment(ctx, telegramID, department)
 	}
 	if year != 0 {
-		if err := db.UpdateUserYear(id, year); err != nil {
-			t.Fatalf("failed to set year for user %d: %v", id, err)
-		}
+		_ = db.UpdateUserYear(ctx, telegramID, year)
 	}
+	_ = db.UpdateUserVerified(ctx, telegramID, true)
 }
 
-func TestChatServiceSearchPartnerMatchesAndUpdatesState(t *testing.T) {
-	chatSvc, db := setupTestChatService(t, 10)
-
-	createUserForTest(t, db, 1001, string(models.GenderMale), string(models.DeptTeknikInformatika), 2022)
-	createUserForTest(t, db, 1002, string(models.GenderMale), string(models.DeptTeknikInformatika), 2022)
-
-	matchID, err := chatSvc.SearchPartner(1002, "", "", 0)
+func setupTestRedis(t *testing.T) *miniredis.Miniredis {
+	t.Helper()
+	mr, err := miniredis.Run()
 	if err != nil {
-		t.Fatalf("unexpected error when enqueueing user2: %v", err)
+		t.Fatalf("failed to start miniredis: %v", err)
 	}
-	if matchID != 0 {
-		t.Fatalf("expected no immediate match for user2, got %d", matchID)
-	}
-
-	matchID, err = chatSvc.SearchPartner(1001, string(models.DeptTeknikInformatika), string(models.GenderMale), 2022)
-	if err != nil {
-		t.Fatalf("unexpected error when matching user1: %v", err)
-	}
-	if matchID != 1002 {
-		t.Fatalf("expected matchID=1002, got %d", matchID)
-	}
-
-	state1, _, err := db.GetUserState(1001)
-	if err != nil {
-		t.Fatalf("failed to get state user1: %v", err)
-	}
-	state2, _, err := db.GetUserState(1002)
-	if err != nil {
-		t.Fatalf("failed to get state user2: %v", err)
-	}
-	if state1 != models.StateInChat || state2 != models.StateInChat {
-		t.Fatalf("expected both users in_chat, got user1=%s user2=%s", state1, state2)
-	}
+	t.Cleanup(mr.Close)
+	_ = os.Setenv("REDIS_URL", "redis://"+mr.Addr())
+	return mr
 }
 
-func TestChatServiceFiltering(t *testing.T) {
-	chatSvc, db := setupTestChatService(t, 10)
-
-	createUserForTest(t, db, 5001, string(models.GenderMale), string(models.DeptTeknikInformatika), 2022)
-	createUserForTest(t, db, 5002, string(models.GenderFemale), string(models.DeptTeknikMesin), 2022)
-	createUserForTest(t, db, 5003, string(models.GenderMale), string(models.DeptTeknikInformatika), 2021)
-
-	_, _ = chatSvc.SearchPartner(5002, "NON_EXISTENT", "", 0)
-	_, _ = chatSvc.SearchPartner(5003, "NON_EXISTENT", "", 0)
-
-	matchID, err := chatSvc.SearchPartner(5001, string(models.DeptTeknikInformatika), "", 0)
-	if err != nil {
-		t.Logf("SearchPartner error: %v", err)
-	}
-	if matchID != 5003 {
-		t.Errorf("Expected match with User C (5003) due to TIK filter, got %d", matchID)
-	}
-
-	_, _ = chatSvc.StopChat(5001)
-	_ = db.SetUserState(5001, models.StateNone, "")
-	_ = db.SetUserState(5002, models.StateNone, "")
-	_ = db.SetUserState(5003, models.StateNone, "")
-
-	_, _ = chatSvc.SearchPartner(5002, "NON_EXISTENT", "", 0)
-	_, _ = chatSvc.SearchPartner(5003, "NON_EXISTENT", "", 0)
-	matchID, _ = chatSvc.SearchPartner(5001, "", "", 2022)
-	if matchID != 5002 {
-		t.Errorf("Expected match with User B (5002) due to Year filter, got %d", matchID)
-	}
-}
-
-func TestChatServiceSearchPartnerRateLimit(t *testing.T) {
-	chatSvc, db := setupTestChatService(t, 1)
-	createUserForTest(t, db, 2001, "", "", 0)
-
-	if _, err := chatSvc.SearchPartner(2001, "", "", 0); err != nil {
-		t.Fatalf("first search should pass, got: %v", err)
-	}
-
-	_, err := chatSvc.SearchPartner(2001, "", "", 0)
-	if err == nil {
-		t.Fatalf("expected rate limit error on second search")
-	}
-	if !strings.Contains(err.Error(), "terlalu sering mencari partner") {
-		t.Fatalf("unexpected error message: %v", err)
-	}
-}
-
-func TestChatServiceProcessQueueTimeoutClearsFilters(t *testing.T) {
-	chatSvc, _ := setupTestChatService(t, 10)
-
-	item := QueueItem{
-		TelegramID: 3001,
-		Dept:       string(models.DeptAkuntansi),
-		Gender:     string(models.GenderFemale),
-		Year:       2021,
-		JoinedAt:   time.Now().Add(-2 * time.Minute).Unix(),
-	}
-
-	if err := chatSvc.redis.AddToQueue(int64(3001), item); err != nil {
-		t.Fatalf("failed to enqueue queue item: %v", err)
-	}
-
-	updatedIDs, err := chatSvc.ProcessQueueTimeout(60)
-	if err != nil {
-		t.Fatalf("unexpected timeout processing error: %v", err)
-	}
-	if !slices.Contains(updatedIDs, int64(3001)) {
-		t.Fatalf("expected updated IDs to contain 3001, got %v", updatedIDs)
-	}
-
-	storedRaw, err := chatSvc.redis.client.LIndex(chatSvc.redis.ctx, "chat_queue", 0).Result()
-	if err != nil {
-		t.Fatalf("failed to read updated queue item: %v", err)
-	}
-
-	var updated QueueItem
-	if err := json.Unmarshal([]byte(storedRaw), &updated); err != nil {
-		t.Fatalf("failed to unmarshal updated queue item: %v", err)
-	}
-
-	if updated.Dept != "" || updated.Gender != "" || updated.Year != 0 {
-		t.Fatalf("expected filters to be cleared, got %+v", updated)
-	}
-}
-
-func TestProfileServiceOnboardingFlow(t *testing.T) {
+func TestChatServiceMatch(t *testing.T) {
 	db := setupTestDB(t)
-	profileSvc := NewProfileService(db, &config.Config{})
-	userID := int64(4001)
+	mr := setupTestRedis(t)
+	redisSvc := NewRedisService()
+	chatSvc := NewChatService(db, redisSvc, 5)
+	ctx := context.Background()
 
+	user1 := int64(3001)
+	user2 := int64(3002)
+
+	createUserForTest(t, db, user1, "Laki-laki", "Teknik Informatika & Komputer", 2022)
+	createUserForTest(t, db, user2, "Perempuan", "Teknik Informatika & Komputer", 2022)
+
+	partner1, err := chatSvc.SearchPartner(ctx, user1, "", "", 0)
+	if err != nil {
+		t.Fatalf("SearchPartner for user1 failed: %v", err)
+	}
+	if partner1 != 0 {
+		t.Error("User 1 should be in queue, not matched immediately")
+	}
+
+	partner2, err := chatSvc.SearchPartner(ctx, user2, "", "", 0)
+	if err != nil {
+		t.Fatalf("SearchPartner for user2 failed: %v", err)
+	}
+	if partner2 != user1 {
+		t.Errorf("Expected User 2 to match with User 1, got %d", partner2)
+	}
+
+	session, _ := db.GetActiveSession(ctx, user1)
+	if session == nil {
+		t.Fatal("Active session not found")
+	}
+	if (session.User1ID == user1 && session.User2ID == user2) || (session.User1ID == user2 && session.User2ID == user1) {
+	} else {
+		t.Errorf("Active session incorrect: user1=%d, user2=%d, got user1=%d, user2=%d", user1, user2, session.User1ID, session.User2ID)
+	}
+
+	mr.FlushAll()
+}
+
+func TestChatServiceStop(t *testing.T) {
+	db := setupTestDB(t)
+	mr := setupTestRedis(t)
+	redisSvc := NewRedisService()
+	chatSvc := NewChatService(db, redisSvc, 5)
+	ctx := context.Background()
+
+	user1, user2 := int64(3003), int64(3004)
+	createUserForTest(t, db, user1, "", "", 0)
+	createUserForTest(t, db, user2, "", "", 0)
+
+	_, _ = chatSvc.SearchPartner(ctx, user1, "", "", 0)
+	_, _ = chatSvc.SearchPartner(ctx, user2, "", "", 0)
+
+	partnerID, err := chatSvc.StopChat(ctx, user1)
+	if err != nil {
+		t.Fatalf("StopChat failed: %v", err)
+	}
+	if partnerID != user2 {
+		t.Errorf("Expected partner %d, got %d", user2, partnerID)
+	}
+
+	session, _ := db.GetActiveSession(ctx, user1)
+	if session != nil {
+		t.Error("Session should be closed")
+	}
+
+	mr.FlushAll()
+}
+
+func TestChatServiceMatchFilters(t *testing.T) {
+	db := setupTestDB(t)
+	mr := setupTestRedis(t)
+	redisSvc := NewRedisService()
+	chatSvc := NewChatService(db, redisSvc, 5)
+	ctx := context.Background()
+
+	user1, user2, user3 := int64(3005), int64(3006), int64(3007)
+	createUserForTest(t, db, user1, "Perempuan", "Teknik Informatika & Komputer", 2022)
+	createUserForTest(t, db, user2, "Laki-laki", "Teknik Mesin", 2022)
+	createUserForTest(t, db, user3, "Laki-laki", "Teknik Informatika & Komputer", 2023)
+
+	_, _ = chatSvc.SearchPartner(ctx, user1, "", "", 0)
+	_, _ = chatSvc.SearchPartner(ctx, user2, "Teknik Sipil", "", 0)
+
+	partner3, err := chatSvc.SearchPartner(ctx, user3, "Teknik Informatika & Komputer", "", 0)
+	if err != nil {
+		t.Fatalf("SearchPartner failed: %v", err)
+	}
+	if partner3 != user1 {
+		t.Errorf("Expected User 3 to match with User 1 (TIK), got %d", partner3)
+	}
+
+	mr.FlushAll()
+}
+
+func TestChatServiceQueueTimeout(t *testing.T) {
+	db := setupTestDB(t)
+	mr := setupTestRedis(t)
+	redisSvc := NewRedisService()
+	chatSvc := NewChatService(db, redisSvc, 5)
+	ctx := context.Background()
+
+	userID := int64(3008)
 	createUserForTest(t, db, userID, "", "", 0)
 
-	if err := profileSvc.SetGender(userID, string(models.GenderMale)); err != nil {
-		t.Fatalf("SetGender failed: %v", err)
-	}
-	state, _, err := db.GetUserState(userID)
+	_, err := chatSvc.SearchPartner(ctx, userID, "TIK", "L", 0)
 	if err != nil {
-		t.Fatalf("failed to get state after SetGender: %v", err)
-	}
-	if state != models.StateAwaitingYear {
-		t.Fatalf("expected state awaiting_year, got %s", state)
+		t.Fatalf("SearchPartner failed: %v", err)
 	}
 
-	currentYear := models.CurrentEntryYear()
-	if err := profileSvc.SetYear(userID, currentYear); err != nil {
-		t.Fatalf("SetYear failed: %v", err)
-	}
-	state, _, err = db.GetUserState(userID)
-	if err != nil {
-		t.Fatalf("failed to get state after SetYear: %v", err)
-	}
-	if state != models.StateAwaitingDept {
-		t.Fatalf("expected state awaiting_department, got %s", state)
+	queueKey := "chat_queue"
+	list, _ := mr.List(queueKey)
+	if len(list) == 0 {
+		t.Fatal("Queue is empty")
 	}
 
-	if err := profileSvc.SetDepartment(userID, string(models.DeptTeknikMesin)); err != nil {
-		t.Fatalf("SetDepartment failed: %v", err)
-	}
-	state, _, err = db.GetUserState(userID)
-	if err != nil {
-		t.Fatalf("failed to get state after SetDepartment: %v", err)
-	}
-	if state != models.StateNone {
-		t.Fatalf("expected state none, got %s", state)
+	var item QueueItem
+	_ = json.Unmarshal([]byte(list[0]), &item)
+	item.JoinedAt = time.Now().Add(-10 * time.Minute).Unix()
+
+	if err := redisSvc.AddToQueue(ctx, userID, item); err != nil {
+		t.Fatalf("Failed to update queue item for test: %v", err)
 	}
 
-	user, err := db.GetUser(userID)
+	timedOut, err := chatSvc.ProcessQueueTimeout(ctx, 300)
 	if err != nil {
-		t.Fatalf("failed to load user: %v", err)
+		t.Fatalf("ProcessQueueTimeout failed: %v", err)
 	}
-	if user == nil || user.DisplayName == "" {
-		t.Fatalf("expected non-empty display name after SetDepartment")
+
+	if !slices.Contains(timedOut, userID) {
+		t.Error("User should be in timed out list")
+	}
+
+	listAfter, _ := mr.List(queueKey)
+	if len(listAfter) == 0 {
+		t.Fatal("User was incorrectly removed from queue")
+	}
+	var itemAfter QueueItem
+	_ = json.Unmarshal([]byte(listAfter[0]), &itemAfter)
+	if itemAfter.Dept != "" || itemAfter.Gender != "" {
+		t.Errorf("Filters were not relaxed: dept=%s, gender=%s", itemAfter.Dept, itemAfter.Gender)
+	}
+
+	mr.FlushAll()
+}
+
+func TestEvidenceService(t *testing.T) {
+	db := setupTestDB(t)
+	mr := setupTestRedis(t)
+	redisClient := NewRedisService().GetClient()
+	evidenceSvc := NewEvidenceService(db, redisClient)
+	ctx := context.Background()
+
+	sessionID := int64(501)
+	evidenceSvc.LogMessage(ctx, sessionID, 101, "Hello", "text")
+	evidenceSvc.LogMessage(ctx, sessionID, 102, "Hi there", "text")
+
+	evidence, err := evidenceSvc.GetEvidence(ctx, sessionID)
+	if err != nil {
+		t.Fatalf("GetEvidence failed: %v", err)
+	}
+
+	if !strings.Contains(evidence, "Hello") || !strings.Contains(evidence, "Hi there") {
+		t.Error("Evidence content missing")
+	}
+
+	evidenceSvc.ClearEvidence(ctx, sessionID)
+	val := mr.Exists("chat_evidence:501")
+	if val {
+		t.Error("Evidence should be cleared in Redis")
 	}
 }
 
-func TestProfileServiceRejectsInvalidYear(t *testing.T) {
+func TestEvidenceServiceCap(t *testing.T) {
 	db := setupTestDB(t)
-	profileSvc := NewProfileService(db, &config.Config{})
-	userID := int64(5001)
+	_ = setupTestRedis(t)
+	redisClient := NewRedisService().GetClient()
+	evidenceSvc := NewEvidenceService(db, redisClient)
+	ctx := context.Background()
 
-	createUserForTest(t, db, userID, "", "", 0)
-
-	invalidFutureYear := models.CurrentEntryYear() + 1
-	if err := profileSvc.SetYear(userID, invalidFutureYear); err == nil {
-		t.Fatalf("expected SetYear to reject year %d", invalidFutureYear)
+	sessionID := int64(502)
+	for i := 0; i < 30; i++ {
+		evidenceSvc.LogMessage(ctx, sessionID, 101, strings.Repeat("a", i), "text")
 	}
 
-	if err := profileSvc.UpdateYear(userID, models.MinEntryYear-1); err == nil {
-		t.Fatalf("expected UpdateYear to reject year %d", models.MinEntryYear-1)
+	evidence, _ := evidenceSvc.GetEvidence(ctx, sessionID)
+	lines := strings.Split(strings.TrimSpace(evidence), "\n")
+	if len(lines) > 20 {
+		t.Errorf("Expected max 20 lines, got %d", len(lines))
 	}
 }

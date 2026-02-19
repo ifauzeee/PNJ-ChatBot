@@ -38,6 +38,8 @@ type Config struct {
 	MaxSearchPerMinute    int
 	MaxConfessionsPerHour int
 	MaxReportsPerDay      int
+	MaxWhispersPerHour    int
+	MaxRepliesPerHour     int
 
 	AutoBanReportCount int
 
@@ -77,6 +79,8 @@ func Load() *Config {
 		MaxSearchPerMinute:    getEnvInt("MAX_SEARCH_PER_MINUTE", 5),
 		MaxConfessionsPerHour: getEnvInt("MAX_CONFESSIONS_PER_HOUR", 3),
 		MaxReportsPerDay:      getEnvInt("MAX_REPORTS_PER_DAY", 5),
+		MaxWhispersPerHour:    getEnvInt("MAX_WHISPERS_PER_HOUR", 5),
+		MaxRepliesPerHour:     getEnvInt("MAX_REPLIES_PER_HOUR", 10),
 		AutoBanReportCount:    getEnvInt("AUTO_BAN_REPORT_COUNT", 3),
 		MaintenanceAccountID:  getEnvInt64("MAINTENANCE_ID", 0),
 		BrevoAPIKey:           getEnv("BREVO_API_KEY", ""),
@@ -95,7 +99,70 @@ func Load() *Config {
 		cfg.MaxUpdateQueue = 1
 	}
 
+	cfg.validate()
+
 	return cfg
+}
+
+func (cfg *Config) validate() {
+	warnings := []string{}
+
+	if cfg.DBType == "postgres" {
+		if cfg.DBHost == "" || cfg.DBUser == "" || cfg.DBName == "" {
+			logger.Fatal("❌ PostgreSQL selected but DB_HOST, DB_USER, or DB_NAME is empty")
+		}
+	}
+
+	if cfg.BrevoAPIKey == "" && cfg.SMTPUsername == "" {
+		warnings = append(warnings, "No email sender configured (BREVO_API_KEY or SMTP_USERNAME). OTP emails will fail.")
+	}
+
+	if cfg.MaxSearchPerMinute <= 0 {
+		cfg.MaxSearchPerMinute = 5
+		warnings = append(warnings, "MAX_SEARCH_PER_MINUTE invalid, defaulting to 5")
+	}
+	if cfg.MaxConfessionsPerHour <= 0 {
+		cfg.MaxConfessionsPerHour = 3
+		warnings = append(warnings, "MAX_CONFESSIONS_PER_HOUR invalid, defaulting to 3")
+	}
+	if cfg.MaxReportsPerDay <= 0 {
+		cfg.MaxReportsPerDay = 5
+		warnings = append(warnings, "MAX_REPORTS_PER_DAY invalid, defaulting to 5")
+	}
+	if cfg.AutoBanReportCount <= 0 {
+		cfg.AutoBanReportCount = 3
+		warnings = append(warnings, "AUTO_BAN_REPORT_COUNT invalid, defaulting to 3")
+	}
+
+	if cfg.OTPLength < 4 || cfg.OTPLength > 8 {
+		cfg.OTPLength = 6
+		warnings = append(warnings, "OTP_LENGTH out of range (4-8), defaulting to 6")
+	}
+	if cfg.OTPExpiryMinutes < 1 || cfg.OTPExpiryMinutes > 60 {
+		cfg.OTPExpiryMinutes = 10
+		warnings = append(warnings, "OTP_EXPIRY_MINUTES out of range (1-60), defaulting to 10")
+	}
+
+	if cfg.SightengineAPIUser == "" || cfg.SightengineAPISecret == "" {
+		warnings = append(warnings, "Sightengine API not configured. Image moderation disabled.")
+	}
+
+	if cfg.MaintenanceAccountID == 0 {
+		warnings = append(warnings, "MAINTENANCE_ID not set. Admin commands will be disabled.")
+	}
+
+	for _, w := range warnings {
+		logger.Warn("⚠️ Config warning: " + w)
+	}
+
+	logger.Info("📋 Configuration loaded",
+		zap.String("db_type", cfg.DBType),
+		zap.Int("workers", cfg.MaxUpdateWorkers),
+		zap.Int("queue_size", cfg.MaxUpdateQueue),
+		zap.Int("max_search_per_min", cfg.MaxSearchPerMinute),
+		zap.Int("max_confess_per_hr", cfg.MaxConfessionsPerHour),
+		zap.Int("auto_ban_threshold", cfg.AutoBanReportCount),
+	)
 }
 
 func getEnv(key, defaultVal string) string {

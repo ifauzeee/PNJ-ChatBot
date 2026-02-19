@@ -1,16 +1,18 @@
 package bot
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 	"strings"
 
+	"github.com/pnj-anonymous-bot/internal/metrics"
 	"github.com/pnj-anonymous-bot/internal/models"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
-func (b *Bot) handleCallback(callback *tgbotapi.CallbackQuery) {
+func (b *Bot) handleCallback(ctx context.Context, callback *tgbotapi.CallbackQuery) {
 	telegramID := callback.From.ID
 	data := callback.Data
 
@@ -25,26 +27,26 @@ func (b *Bot) handleCallback(callback *tgbotapi.CallbackQuery) {
 	value := parts[1]
 
 	if handler, exists := b.callbacks[category]; exists {
-		handler(telegramID, value, callback)
+		metrics.CallbacksTotal.WithLabelValues(category).Inc()
+		handler(ctx, telegramID, value, callback)
 	}
 }
 
-func (b *Bot) handleGenderCallback(telegramID int64, gender string, callback *tgbotapi.CallbackQuery) {
-	deleteMsg := tgbotapi.NewDeleteMessage(telegramID, callback.Message.MessageID)
-	_, _ = b.api.Send(deleteMsg)
+func (b *Bot) handleGenderCallback(ctx context.Context, telegramID int64, gender string, callback *tgbotapi.CallbackQuery) {
+	b.deleteMessage(telegramID, callback.Message.MessageID, "delete_gender_callback")
 
-	_, stateData, _ := b.db.GetUserState(telegramID)
+	_, stateData, _ := b.db.GetUserState(ctx, telegramID)
 	if stateData == "edit" {
-		if err := b.profile.UpdateGender(telegramID, gender); err != nil {
+		if err := b.profile.UpdateGender(ctx, telegramID, gender); err != nil {
 			b.sendMessage(telegramID, fmt.Sprintf("⚠️ %s", err.Error()), nil)
 			return
 		}
-		_ = b.db.SetUserState(telegramID, models.StateNone, "")
+		logIfErr("set_state_none_edit_gender", b.db.SetUserState(ctx, telegramID, models.StateNone, ""))
 		b.sendMessage(telegramID, "✅ Profil berhasil diperbarui!", nil)
 		return
 	}
 
-	err := b.profile.SetGender(telegramID, gender)
+	err := b.profile.SetGender(ctx, telegramID, gender)
 	if err != nil {
 		b.sendMessage(telegramID, fmt.Sprintf("⚠️ %s", err.Error()), nil)
 		return
@@ -56,22 +58,22 @@ func (b *Bot) handleGenderCallback(telegramID int64, gender string, callback *tg
 	kb := YearKeyboard()
 	b.sendMessage(telegramID, "🎓 *Pilih Tahun Angkatan (Masuk) Kamu:*", &kb)
 }
-func (b *Bot) handleDeptCallback(telegramID int64, dept string, callback *tgbotapi.CallbackQuery) {
-	deleteMsg := tgbotapi.NewDeleteMessage(telegramID, callback.Message.MessageID)
-	_, _ = b.api.Send(deleteMsg)
 
-	_, stateData, _ := b.db.GetUserState(telegramID)
+func (b *Bot) handleDeptCallback(ctx context.Context, telegramID int64, dept string, callback *tgbotapi.CallbackQuery) {
+	b.deleteMessage(telegramID, callback.Message.MessageID, "delete_dept_callback")
+
+	_, stateData, _ := b.db.GetUserState(ctx, telegramID)
 	if stateData == "edit" {
-		if err := b.profile.UpdateDepartment(telegramID, dept); err != nil {
+		if err := b.profile.UpdateDepartment(ctx, telegramID, dept); err != nil {
 			b.sendMessage(telegramID, fmt.Sprintf("⚠️ %s", err.Error()), nil)
 			return
 		}
-		_ = b.db.SetUserState(telegramID, models.StateNone, "")
+		logIfErr("set_state_none_edit_dept", b.db.SetUserState(ctx, telegramID, models.StateNone, ""))
 		b.sendMessage(telegramID, "✅ Profil berhasil diperbarui!", nil)
 		return
 	}
 
-	err := b.profile.SetDepartment(telegramID, dept)
+	err := b.profile.SetDepartment(ctx, telegramID, dept)
 	if err != nil {
 		b.sendMessage(telegramID, fmt.Sprintf("⚠️ %s", err.Error()), nil)
 		return
@@ -80,31 +82,30 @@ func (b *Bot) handleDeptCallback(telegramID int64, dept string, callback *tgbota
 	emoji := models.DepartmentEmoji(models.Department(dept))
 	b.sendMessage(telegramID, fmt.Sprintf("✅ Jurusan dipilih: %s *%s*", emoji, dept), nil)
 
-	user, err := b.db.GetUser(telegramID)
+	user, err := b.db.GetUser(ctx, telegramID)
 	if err == nil && user != nil && user.Year == 0 {
-		_ = b.db.SetUserState(telegramID, models.StateAwaitingYear, "")
+		logIfErr("set_state_awaiting_year", b.db.SetUserState(ctx, telegramID, models.StateAwaitingYear, ""))
 		kb := YearKeyboard()
 		b.sendMessage(telegramID, "🎓 *Pilih Tahun Angkatan (Masuk) Kamu:*", &kb)
 		return
 	}
 
 	if user != nil {
-		b.showMainMenu(telegramID, user)
+		b.showMainMenu(ctx, telegramID, user)
 	}
 }
-func (b *Bot) handleSearchCallback(telegramID int64, value string, callback *tgbotapi.CallbackQuery) {
+
+func (b *Bot) handleSearchCallback(ctx context.Context, telegramID int64, value string, callback *tgbotapi.CallbackQuery) {
 	if value == "cancel" {
-		deleteMsg := tgbotapi.NewDeleteMessage(telegramID, callback.Message.MessageID)
-		_, _ = b.api.Send(deleteMsg)
-		_ = b.chat.CancelSearch(telegramID)
+		b.deleteMessage(telegramID, callback.Message.MessageID, "delete_search_cancel")
+		logIfErr("cancel_search_callback", b.chat.CancelSearch(ctx, telegramID))
 		b.sendMessage(telegramID, "❌ Pencarian dibatalkan.", nil)
 		return
 	}
 
 	if value == "any" {
-		deleteMsg := tgbotapi.NewDeleteMessage(telegramID, callback.Message.MessageID)
-		_, _ = b.api.Send(deleteMsg)
-		b.startSearch(telegramID, "", "", 0)
+		b.deleteMessage(telegramID, callback.Message.MessageID, "delete_search_any")
+		b.startSearch(ctx, telegramID, "", "", 0)
 		return
 	}
 
@@ -113,7 +114,7 @@ func (b *Bot) handleSearchCallback(telegramID int64, value string, callback *tgb
 		editMsg := tgbotapi.NewEditMessageText(telegramID, callback.Message.MessageID, "👫 *Pilih Gender Partner:*")
 		editMsg.ParseMode = "Markdown"
 		editMsg.ReplyMarkup = &kb
-		_, _ = b.api.Send(editMsg)
+		b.sendAPI("edit_search_gender", editMsg)
 		return
 	}
 
@@ -122,7 +123,7 @@ func (b *Bot) handleSearchCallback(telegramID int64, value string, callback *tgb
 		editMsg := tgbotapi.NewEditMessageText(telegramID, callback.Message.MessageID, "🏛️ *Pilih Jurusan Partner:*")
 		editMsg.ParseMode = "Markdown"
 		editMsg.ReplyMarkup = &kb
-		_, _ = b.api.Send(editMsg)
+		b.sendAPI("edit_search_dept", editMsg)
 		return
 	}
 
@@ -131,44 +132,40 @@ func (b *Bot) handleSearchCallback(telegramID int64, value string, callback *tgb
 		editMsg := tgbotapi.NewEditMessageText(telegramID, callback.Message.MessageID, "🎓 *Pilih Angkatan Partner:*")
 		editMsg.ParseMode = "Markdown"
 		editMsg.ReplyMarkup = &kb
-		_, _ = b.api.Send(editMsg)
+		b.sendAPI("edit_search_year", editMsg)
 		return
 	}
 
 	if strings.HasPrefix(value, "year:") {
-		deleteMsg := tgbotapi.NewDeleteMessage(telegramID, callback.Message.MessageID)
-		_, _ = b.api.Send(deleteMsg)
+		b.deleteMessage(telegramID, callback.Message.MessageID, "delete_search_year")
 		yearStr := strings.TrimPrefix(value, "year:")
 		year, _ := strconv.Atoi(yearStr)
-		b.startSearch(telegramID, "", "", year)
+		b.startSearch(ctx, telegramID, "", "", year)
 		return
 	}
 
 	if strings.HasPrefix(value, "gender:") {
-		deleteMsg := tgbotapi.NewDeleteMessage(telegramID, callback.Message.MessageID)
-		_, _ = b.api.Send(deleteMsg)
+		b.deleteMessage(telegramID, callback.Message.MessageID, "delete_search_gender")
 		gender := strings.TrimPrefix(value, "gender:")
-		b.startSearch(telegramID, "", gender, 0)
+		b.startSearch(ctx, telegramID, "", gender, 0)
 		return
 	}
 
 	if strings.HasPrefix(value, "dept:") {
-		deleteMsg := tgbotapi.NewDeleteMessage(telegramID, callback.Message.MessageID)
-		_, _ = b.api.Send(deleteMsg)
+		b.deleteMessage(telegramID, callback.Message.MessageID, "delete_search_dept_filter")
 		dept := strings.TrimPrefix(value, "dept:")
-		b.startSearch(telegramID, dept, "", 0)
+		b.startSearch(ctx, telegramID, dept, "", 0)
 		return
 	}
 
-	deleteMsg := tgbotapi.NewDeleteMessage(telegramID, callback.Message.MessageID)
-	_, _ = b.api.Send(deleteMsg)
-	b.startSearch(telegramID, value, "", 0)
+	b.deleteMessage(telegramID, callback.Message.MessageID, "delete_search_default")
+	b.startSearch(ctx, telegramID, value, "", 0)
 }
 
-func (b *Bot) handleChatActionCallback(telegramID int64, action string, _ *tgbotapi.CallbackQuery) {
+func (b *Bot) handleChatActionCallback(ctx context.Context, telegramID int64, action string, _ *tgbotapi.CallbackQuery) {
 	switch action {
 	case "next":
-		partnerID, err := b.chat.NextPartner(telegramID)
+		partnerID, err := b.chat.NextPartner(ctx, telegramID)
 		if err != nil {
 			b.sendMessage(telegramID, fmt.Sprintf("⚠️ %s", err.Error()), nil)
 			return
@@ -177,52 +174,51 @@ func (b *Bot) handleChatActionCallback(telegramID int64, action string, _ *tgbot
 			b.sendMessage(partnerID, "👋 *Partner kamu telah memutus chat.*\n\nGunakan /search untuk mencari partner baru.", nil)
 		}
 		b.sendMessage(telegramID, "⏭️ *Mencari partner baru...*", nil)
-		b.startSearch(telegramID, "", "", 0)
+		b.startSearch(ctx, telegramID, "", "", 0)
 
 	case "stop":
-		partnerID, _ := b.chat.StopChat(telegramID)
+		partnerID, _ := b.chat.StopChat(ctx, telegramID)
 		if partnerID > 0 {
 			b.sendMessage(partnerID, "👋 *Partner kamu telah memutus chat.*\n\nGunakan /search untuk mencari partner baru.", nil)
 		}
 		b.sendMessage(telegramID, "🛑 *Chat dihentikan.*", nil)
 
 	case "report":
-		partnerID, err := b.chat.GetPartner(telegramID)
+		partnerID, err := b.chat.GetPartner(ctx, telegramID)
 		if err != nil || partnerID == 0 {
 			b.sendMessage(telegramID, "⚠️ Tidak ada partner saat ini.", nil)
 			return
 		}
-		_ = b.db.SetUserState(telegramID, models.StateAwaitingReport, fmt.Sprintf("%d", partnerID))
+		logIfErr("set_state_report_callback", b.db.SetUserState(ctx, telegramID, models.StateAwaitingReport, fmt.Sprintf("%d", partnerID)))
 		b.sendMessage(telegramID, "⚠️ *Laporkan Partner*\n\nTuliskan alasan kamu:\n_Ketik /cancel untuk membatalkan_", nil)
 
 	case "block":
-		partnerID, err := b.chat.GetPartner(telegramID)
+		partnerID, err := b.chat.GetPartner(ctx, telegramID)
 		if err != nil || partnerID == 0 {
 			b.sendMessage(telegramID, "⚠️ Tidak ada partner saat ini.", nil)
 			return
 		}
-		_ = b.profile.BlockUser(telegramID, partnerID)
-		_, _ = b.chat.StopChat(telegramID)
+		logIfErr("block_user_callback", b.profile.BlockUser(ctx, telegramID, partnerID))
+		if _, err := b.chat.StopChat(ctx, telegramID); err != nil {
+			logIfErr("stop_chat_after_block_callback", err)
+		}
 		b.sendMessage(partnerID, "👋 *Partner kamu telah memutus chat.*", nil)
 		b.sendMessage(telegramID, "🚫 *Partner telah di-block.*", nil)
 	}
 }
 
-func (b *Bot) handleMenuCallback(telegramID int64, action string, callback *tgbotapi.CallbackQuery) {
-
-	deleteMsg := tgbotapi.NewDeleteMessage(telegramID, callback.Message.MessageID)
-	_, _ = b.api.Send(deleteMsg)
+func (b *Bot) handleMenuCallback(ctx context.Context, telegramID int64, action string, callback *tgbotapi.CallbackQuery) {
+	b.deleteMessage(telegramID, callback.Message.MessageID, "delete_menu_callback")
 
 	switch action {
 	case "main":
-		user, _ := b.db.GetUser(telegramID)
+		user, _ := b.db.GetUser(ctx, telegramID)
 		if user != nil {
-			b.showMainMenu(telegramID, user)
+			b.showMainMenu(ctx, telegramID, user)
 		}
 
 	case "search":
-
-		if complete, _ := b.auth.IsProfileComplete(telegramID); !complete {
+		if complete, _ := b.auth.IsProfileComplete(ctx, telegramID); !complete {
 			b.sendMessage(telegramID, "⚠️ Profil belum lengkap. Ketik /start untuk melengkapi.", nil)
 			return
 		}
@@ -230,7 +226,7 @@ func (b *Bot) handleMenuCallback(telegramID int64, action string, callback *tgbo
 		b.sendMessage(telegramID, "🔍 *Cari Partner Chat Anonim*\n\nPilih filter pencarian:", &kb)
 
 	case "confess":
-		_ = b.db.SetUserState(telegramID, models.StateAwaitingConfess, "")
+		logIfErr("set_state_confess_menu", b.db.SetUserState(ctx, telegramID, models.StateAwaitingConfess, ""))
 		b.sendMessage(telegramID, `💬 *Tulis Confession Kamu*
 
 📝 Ketik confession kamu sekarang...
@@ -240,30 +236,30 @@ Atau ketik /cancel untuk membatalkan.
 
 	case "confessions":
 		msg := &tgbotapi.Message{From: &tgbotapi.User{ID: telegramID}}
-		b.handleConfessions(msg)
+		b.handleConfessions(ctx, msg)
 
 	case "polls":
 		msg := &tgbotapi.Message{From: &tgbotapi.User{ID: telegramID}}
-		b.handleViewPolls(msg)
+		b.handleViewPolls(ctx, msg)
 
 	case "whisper":
 		kb := WhisperDeptKeyboard()
 		b.sendMessage(telegramID, "📢 *Whisper - Pesan Anonim ke Jurusan*\n\n🎯 Pilih jurusan tujuan:", &kb)
 
 	case "circles":
-		b.handleCircles(&tgbotapi.Message{From: &tgbotapi.User{ID: telegramID}})
+		b.handleCircles(ctx, &tgbotapi.Message{From: &tgbotapi.User{ID: telegramID}})
 
 	case "profile":
 		msg := &tgbotapi.Message{From: &tgbotapi.User{ID: telegramID}}
-		b.handleProfile(msg)
+		b.handleProfile(ctx, msg)
 
 	case "stats":
 		msg := &tgbotapi.Message{From: &tgbotapi.User{ID: telegramID}}
-		b.handleStats(msg)
+		b.handleStats(ctx, msg)
 
 	case "leaderboard":
 		msg := &tgbotapi.Message{From: &tgbotapi.User{ID: telegramID}}
-		b.handleLeaderboard(msg)
+		b.handleLeaderboard(ctx, msg)
 
 	case "edit":
 		kb := EditProfileKeyboard()
@@ -271,58 +267,57 @@ Atau ketik /cancel untuk membatalkan.
 
 	case "help":
 		msg := &tgbotapi.Message{From: &tgbotapi.User{ID: telegramID}}
-		b.handleHelp(msg)
+		b.handleHelp(ctx, msg)
 
 	case "about":
 		msg := &tgbotapi.Message{From: &tgbotapi.User{ID: telegramID}}
-		b.handleAbout(msg)
+		b.handleAbout(ctx, msg)
 	}
 }
 
-func (b *Bot) handleEditCallback(telegramID int64, field string, callback *tgbotapi.CallbackQuery) {
-	deleteMsg := tgbotapi.NewDeleteMessage(telegramID, callback.Message.MessageID)
-	_, _ = b.api.Send(deleteMsg)
+func (b *Bot) handleEditCallback(ctx context.Context, telegramID int64, field string, callback *tgbotapi.CallbackQuery) {
+	b.deleteMessage(telegramID, callback.Message.MessageID, "delete_edit_callback")
 
 	switch field {
 	case "gender":
 		kb := GenderKeyboard()
 		b.sendMessage(telegramID, "👤 *Pilih Gender Baru:*", &kb)
-		_ = b.db.SetUserState(telegramID, models.StateAwaitingGender, "edit")
+		logIfErr("set_state_edit_gender", b.db.SetUserState(ctx, telegramID, models.StateAwaitingGender, "edit"))
 
 	case "year":
 		kb := YearKeyboard()
 		b.sendMessage(telegramID, "🎓 *Pilih Tahun Angkatan Baru:*", &kb)
-		_ = b.db.SetUserState(telegramID, models.StateAwaitingYear, "edit")
+		logIfErr("set_state_edit_year", b.db.SetUserState(ctx, telegramID, models.StateAwaitingYear, "edit"))
 
 	case "department":
 		kb := DepartmentKeyboard()
 		b.sendMessage(telegramID, "🏛️ *Pilih Jurusan Baru:*", &kb)
-		_ = b.db.SetUserState(telegramID, models.StateAwaitingDept, "edit")
+		logIfErr("set_state_edit_dept", b.db.SetUserState(ctx, telegramID, models.StateAwaitingDept, "edit"))
 	}
 }
-func (b *Bot) handleYearCallback(telegramID int64, value string, callback *tgbotapi.CallbackQuery) {
+
+func (b *Bot) handleYearCallback(ctx context.Context, telegramID int64, value string, callback *tgbotapi.CallbackQuery) {
 	year, err := strconv.Atoi(value)
 	if err != nil {
 		b.sendMessage(telegramID, "⚠️ Tahun angkatan tidak valid.", nil)
 		return
 	}
 
-	deleteMsg := tgbotapi.NewDeleteMessage(telegramID, callback.Message.MessageID)
-	_, _ = b.api.Send(deleteMsg)
+	b.deleteMessage(telegramID, callback.Message.MessageID, "delete_year_callback")
 
-	_, stateData, _ := b.db.GetUserState(telegramID)
+	_, stateData, _ := b.db.GetUserState(ctx, telegramID)
 	if stateData == "edit" {
-		err := b.profile.UpdateYear(telegramID, year)
+		err := b.profile.UpdateYear(ctx, telegramID, year)
 		if err != nil {
 			b.sendMessage(telegramID, fmt.Sprintf("⚠️ %s", err.Error()), nil)
 			return
 		}
-		_ = b.db.SetUserState(telegramID, models.StateNone, "")
+		logIfErr("set_state_none_edit_year", b.db.SetUserState(ctx, telegramID, models.StateNone, ""))
 		b.sendMessage(telegramID, "✅ Profil berhasil diperbarui!", nil)
 		return
 	}
 
-	err = b.profile.SetYear(telegramID, year)
+	err = b.profile.SetYear(ctx, telegramID, year)
 	if err != nil {
 		b.sendMessage(telegramID, fmt.Sprintf("⚠️ %s", err.Error()), nil)
 		return
@@ -330,7 +325,7 @@ func (b *Bot) handleYearCallback(telegramID int64, value string, callback *tgbot
 
 	b.sendMessage(telegramID, fmt.Sprintf("✅ Angkatan dipilih: *%d*", year), nil)
 
-	user, _ := b.db.GetUser(telegramID)
+	user, _ := b.db.GetUser(ctx, telegramID)
 	if user != nil && string(user.Department) == "" {
 		kb := DepartmentKeyboard()
 		b.sendMessage(telegramID, "🏛️ *Pilih Jurusan Kamu:*\n\nPilih jurusan di bawah ini:", &kb)
@@ -338,10 +333,11 @@ func (b *Bot) handleYearCallback(telegramID int64, value string, callback *tgbot
 	}
 
 	if user != nil {
-		b.showMainMenu(telegramID, user)
+		b.showMainMenu(ctx, telegramID, user)
 	}
 }
-func (b *Bot) handleVoteCallback(telegramID int64, value string, callback *tgbotapi.CallbackQuery) {
+
+func (b *Bot) handleVoteCallback(ctx context.Context, telegramID int64, value string, callback *tgbotapi.CallbackQuery) {
 	parts := strings.Split(value, ":")
 	if len(parts) < 2 {
 		return
@@ -350,24 +346,23 @@ func (b *Bot) handleVoteCallback(telegramID int64, value string, callback *tgbot
 	pollID, _ := strconv.ParseInt(parts[0], 10, 64)
 	optionID, _ := strconv.ParseInt(parts[1], 10, 64)
 
-	err := b.db.VotePoll(pollID, telegramID, optionID)
+	err := b.db.VotePoll(ctx, pollID, telegramID, optionID)
 	if err != nil {
 		b.answerCallback(callback.ID, "⚠️ "+err.Error())
 		return
 	}
 
-	poll, err := b.db.GetPoll(pollID)
+	poll, err := b.db.GetPoll(ctx, pollID)
 	if err == nil && poll != nil {
 		kb := PollVoteKeyboard(poll.ID, poll.Options)
 		editMsg := tgbotapi.NewEditMessageReplyMarkup(telegramID, callback.Message.MessageID, kb)
-		_, _ = b.api.Send(editMsg)
+		b.sendAPI("edit_poll_vote", editMsg)
 	}
 
 	b.answerCallback(callback.ID, "✅ Suara kamu berhasil direkam!")
 }
 
-func (b *Bot) handleReactionCallback(telegramID int64, data string, callback *tgbotapi.CallbackQuery) {
-
+func (b *Bot) handleReactionCallback(ctx context.Context, telegramID int64, data string, callback *tgbotapi.CallbackQuery) {
 	parts := strings.SplitN(data, ":", 2)
 	if len(parts) < 2 {
 		return
@@ -380,20 +375,20 @@ func (b *Bot) handleReactionCallback(telegramID int64, data string, callback *tg
 
 	reaction := parts[1]
 
-	err = b.confession.ReactToConfession(confessionID, telegramID, reaction)
+	err = b.confession.ReactToConfession(ctx, confessionID, telegramID, reaction)
 	if err != nil {
 		b.answerCallback(callback.ID, "❌ Gagal menambahkan reaksi")
 		return
 	}
 
-	confession, _ := b.db.GetConfession(confessionID)
+	confession, _ := b.db.GetConfession(ctx, confessionID)
 	if confession != nil {
-		b.checkAchievements(confession.AuthorID)
+		b.checkAchievements(ctx, confession.AuthorID)
 	}
-	b.checkAchievements(telegramID)
-	b.processReward(telegramID, "reaction_given")
+	b.checkAchievements(ctx, telegramID)
+	b.processReward(ctx, telegramID, "reaction_given")
 
-	counts, _ := b.confession.GetReactionCounts(confessionID)
+	counts, _ := b.confession.GetReactionCounts(ctx, confessionID)
 	newKb := ConfessionReactionKeyboard(confessionID, counts)
 
 	editMsg := tgbotapi.NewEditMessageReplyMarkup(
@@ -401,16 +396,15 @@ func (b *Bot) handleReactionCallback(telegramID int64, data string, callback *tg
 		callback.Message.MessageID,
 		newKb,
 	)
-	_, _ = b.api.Send(editMsg)
+	b.sendAPI("edit_reaction_keyboard", editMsg)
 
 	b.answerCallback(callback.ID, fmt.Sprintf("Kamu react %s", reaction))
 }
 
-func (b *Bot) handleWhisperCallback(telegramID int64, dept string, callback *tgbotapi.CallbackQuery) {
-	deleteMsg := tgbotapi.NewDeleteMessage(telegramID, callback.Message.MessageID)
-	_, _ = b.api.Send(deleteMsg)
+func (b *Bot) handleWhisperCallback(ctx context.Context, telegramID int64, dept string, callback *tgbotapi.CallbackQuery) {
+	b.deleteMessage(telegramID, callback.Message.MessageID, "delete_whisper_callback")
 
-	_ = b.db.SetUserState(telegramID, models.StateAwaitingWhisper, dept)
+	logIfErr("set_state_awaiting_whisper", b.db.SetUserState(ctx, telegramID, models.StateAwaitingWhisper, dept))
 
 	emoji := models.DepartmentEmoji(models.Department(dept))
 	b.sendMessage(telegramID, fmt.Sprintf(`📢 *Whisper ke %s %s*
@@ -420,16 +414,15 @@ Tulis pesan anonim kamu untuk mahasiswa %s:
 _Ketik /cancel untuk membatalkan_`, emoji, dept, dept), nil)
 }
 
-func (b *Bot) handleLegalCallback(telegramID int64, value string, callback *tgbotapi.CallbackQuery) {
+func (b *Bot) handleLegalCallback(ctx context.Context, telegramID int64, value string, callback *tgbotapi.CallbackQuery) {
 	if value == "agree" {
-		deleteMsg := tgbotapi.NewDeleteMessage(telegramID, callback.Message.MessageID)
-		_, _ = b.api.Send(deleteMsg)
+		b.deleteMessage(telegramID, callback.Message.MessageID, "delete_legal_callback")
 
-		b.startEmailVerif(telegramID)
+		b.startEmailVerif(ctx, telegramID)
 	}
 }
 
-func (b *Bot) handleCircleCallback(telegramID int64, data string, callback *tgbotapi.CallbackQuery) {
+func (b *Bot) handleCircleCallback(ctx context.Context, telegramID int64, data string, callback *tgbotapi.CallbackQuery) {
 	parts := strings.SplitN(data, ":", 2)
 	action := parts[0]
 
@@ -440,7 +433,7 @@ func (b *Bot) handleCircleCallback(telegramID int64, data string, callback *tgbo
 		}
 		slug := parts[1]
 
-		state, _, _ := b.db.GetUserState(telegramID)
+		state, _, _ := b.db.GetUserState(ctx, telegramID)
 		if state == models.StateInChat {
 			kb := ConfirmKeyboard(fmt.Sprintf("circle:confirm_join:%s", slug), "circle:stay_chat")
 			b.sendMessageHTML(telegramID, `⚠️ <b>Kamu sedang dalam Private Chat aktif</b>
@@ -449,14 +442,13 @@ Bergabung ke circle akan mengakhiri chat kamu saat ini secara otomatis. Apakah k
 			return
 		}
 
-		room, err := b.room.JoinRoom(telegramID, slug)
+		room, err := b.room.JoinRoom(ctx, telegramID, slug)
 		if err != nil {
 			b.answerCallback(callback.ID, "❌ "+err.Error())
 			return
 		}
 
-		deleteMsg := tgbotapi.NewDeleteMessage(telegramID, callback.Message.MessageID)
-		_, _ = b.api.Send(deleteMsg)
+		b.deleteMessage(telegramID, callback.Message.MessageID, "delete_circle_join")
 
 		kb := LeaveCircleKeyboard()
 		text := fmt.Sprintf(`🎉 <b>Berhasil Terhubung ke Circle %s</b>
@@ -471,10 +463,9 @@ Sekarang semua pesan yang kamu ketik akan dikirim ke semua anggota circle ini se
 		b.sendMessageHTML(telegramID, text, &kb)
 
 	case "create":
-		deleteMsg := tgbotapi.NewDeleteMessage(telegramID, callback.Message.MessageID)
-		_, _ = b.api.Send(deleteMsg)
+		b.deleteMessage(telegramID, callback.Message.MessageID, "delete_circle_create")
 
-		_ = b.db.SetUserState(telegramID, models.StateAwaitingRoomName, "")
+		logIfErr("set_state_room_name", b.db.SetUserState(ctx, telegramID, models.StateAwaitingRoomName, ""))
 		b.sendMessage(telegramID, "➕ *Buat Circle Baru*\n\nTuliskan *Nama Circle* yang ingin kamu buat:\n(Contoh: Pejuang Kopi PNJ)\n\n_Ketik /cancel untuk membatalkan_", nil)
 
 	case "confirm_join":
@@ -483,15 +474,14 @@ Sekarang semua pesan yang kamu ketik akan dikirim ke semua anggota circle ini se
 		}
 		slug := parts[1]
 
-		deleteMsg := tgbotapi.NewDeleteMessage(telegramID, callback.Message.MessageID)
-		_, _ = b.api.Send(deleteMsg)
+		b.deleteMessage(telegramID, callback.Message.MessageID, "delete_circle_confirm_join")
 
-		partnerID, _ := b.chat.StopChat(telegramID)
+		partnerID, _ := b.chat.StopChat(ctx, telegramID)
 		if partnerID > 0 {
 			b.sendMessage(partnerID, "👋 *Partner kamu telah memutus chat.*", nil)
 		}
 
-		room, err := b.room.JoinRoom(telegramID, slug)
+		room, err := b.room.JoinRoom(ctx, telegramID, slug)
 		if err != nil {
 			b.sendMessage(telegramID, "❌ "+err.Error(), nil)
 			return
@@ -507,27 +497,23 @@ Pesan kamu sekarang dikirim ke circle ini. Private chat sebelumnya telah dihenti
 		b.sendMessageHTML(telegramID, text, &kb)
 
 	case "stay_chat":
-		deleteMsg := tgbotapi.NewDeleteMessage(telegramID, callback.Message.MessageID)
-		_, _ = b.api.Send(deleteMsg)
+		b.deleteMessage(telegramID, callback.Message.MessageID, "delete_circle_stay_chat")
 		b.answerCallback(callback.ID, "👌 Oke, private chat dilanjutkan.")
 
 	case "leave":
-		deleteMsg := tgbotapi.NewDeleteMessage(telegramID, callback.Message.MessageID)
-		_, _ = b.api.Send(deleteMsg)
-		b.handleLeaveCircle(&tgbotapi.Message{From: &tgbotapi.User{ID: telegramID}})
+		b.deleteMessage(telegramID, callback.Message.MessageID, "delete_circle_leave")
+		b.handleLeaveCircle(ctx, &tgbotapi.Message{From: &tgbotapi.User{ID: telegramID}})
 
 	case "leave_next":
-		deleteMsg := tgbotapi.NewDeleteMessage(telegramID, callback.Message.MessageID)
-		_, _ = b.api.Send(deleteMsg)
+		b.deleteMessage(telegramID, callback.Message.MessageID, "delete_circle_leave_next")
 
-		_ = b.room.LeaveRoom(telegramID)
+		logIfErr("leave_room_for_next", b.room.LeaveRoom(ctx, telegramID))
 		b.sendMessageHTML(telegramID, "👋 <b>Kamu telah keluar dari circle.</b>\n⏭️ <i>Mencari partner baru...</i>", nil)
 
-		b.startSearch(telegramID, "", "", 0)
+		b.startSearch(ctx, telegramID, "", "", 0)
 
 	case "stay":
-		deleteMsg := tgbotapi.NewDeleteMessage(telegramID, callback.Message.MessageID)
-		_, _ = b.api.Send(deleteMsg)
+		b.deleteMessage(telegramID, callback.Message.MessageID, "delete_circle_stay")
 		b.answerCallback(callback.ID, "👌 Oke, kamu tetap di circle.")
 	}
 }

@@ -1,11 +1,13 @@
 package bot
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"time"
 
 	"github.com/pnj-anonymous-bot/internal/logger"
+	"github.com/pnj-anonymous-bot/internal/metrics"
 	"go.uber.org/zap"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
@@ -15,7 +17,7 @@ func (b *Bot) isAdmin(telegramID int64) bool {
 	return telegramID == b.cfg.MaintenanceAccountID
 }
 
-func (b *Bot) handleAdminPoll(msg *tgbotapi.Message) {
+func (b *Bot) handleAdminPoll(ctx context.Context, msg *tgbotapi.Message) {
 	telegramID := msg.From.ID
 	if !b.isAdmin(telegramID) {
 		return
@@ -46,7 +48,7 @@ Polling ini akan disiarkan ke <b>SELURUH</b> pengguna bot yang terverifikasi.`, 
 		}
 	}
 
-	pollID, err := b.db.CreatePoll(0, "[GLOBAL] "+question, options)
+	pollID, err := b.db.CreatePoll(ctx, 0, "[GLOBAL] "+question, options)
 	if err != nil {
 		b.sendMessageHTML(telegramID, "❌ Gagal membuat polling global.", nil)
 		return
@@ -57,7 +59,7 @@ Polling ini akan disiarkan ke <b>SELURUH</b> pengguna bot yang terverifikasi.`, 
 	go b.broadcastGlobalPoll(pollID)
 }
 
-func (b *Bot) handleBroadcast(msg *tgbotapi.Message) {
+func (b *Bot) handleBroadcast(ctx context.Context, msg *tgbotapi.Message) {
 	telegramID := msg.From.ID
 	if !b.isAdmin(telegramID) {
 		return
@@ -75,13 +77,22 @@ func (b *Bot) handleBroadcast(msg *tgbotapi.Message) {
 }
 
 func (b *Bot) broadcastGlobalPoll(pollID int64) {
-	p, err := b.db.GetPoll(pollID)
+	b.background.Add(1)
+	defer b.background.Done()
+
+	ctx := context.Background()
+	start := time.Now()
+	defer func() {
+		metrics.BroadcastDuration.Observe(time.Since(start).Seconds())
+	}()
+
+	p, err := b.db.GetPoll(ctx, pollID)
 	if err != nil {
 		logger.Error("Failed to get poll for broadcast", zap.Int64("poll_id", pollID), zap.Error(err))
 		return
 	}
 
-	users, err := b.db.GetAllVerifiedUsers()
+	users, err := b.db.GetAllVerifiedUsers(ctx)
 	if err != nil {
 		logger.Error("Failed to get users for broadcast", zap.Error(err))
 		return
@@ -116,7 +127,16 @@ func (b *Bot) broadcastGlobalPoll(pollID int64) {
 }
 
 func (b *Bot) broadcastMessage(content string) {
-	users, err := b.db.GetAllVerifiedUsers()
+	b.background.Add(1)
+	defer b.background.Done()
+
+	ctx := context.Background()
+	start := time.Now()
+	defer func() {
+		metrics.BroadcastDuration.Observe(time.Since(start).Seconds())
+	}()
+
+	users, err := b.db.GetAllVerifiedUsers(ctx)
 	if err != nil {
 		logger.Error("Failed to get users for broadcast", zap.Error(err))
 		return

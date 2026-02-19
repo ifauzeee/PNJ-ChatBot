@@ -1,10 +1,40 @@
 package bot
 
 import (
+	"context"
 	"strings"
+
+	"github.com/pnj-anonymous-bot/internal/logger"
+	"github.com/pnj-anonymous-bot/internal/metrics"
+	"go.uber.org/zap"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
+
+func logIfErr(operation string, err error) {
+	if err != nil {
+		logger.Warn("Non-critical operation failed",
+			zap.String("operation", operation),
+			zap.Error(err),
+		)
+		metrics.DatabaseErrors.WithLabelValues(operation).Inc()
+	}
+}
+
+func (b *Bot) sendAPI(operation string, c tgbotapi.Chattable) {
+	if _, err := b.api.Send(c); err != nil {
+		logger.Warn("Failed to send Telegram API message",
+			zap.String("operation", operation),
+			zap.Error(err),
+		)
+		metrics.TelegramAPIErrors.WithLabelValues(operation).Inc()
+	}
+}
+
+func (b *Bot) deleteMessage(chatID int64, messageID int, operation string) {
+	deleteMsg := tgbotapi.NewDeleteMessage(chatID, messageID)
+	b.sendAPI(operation, deleteMsg)
+}
 
 func maskEmail(emailAddr string) string {
 	parts := strings.Split(emailAddr, "@")
@@ -37,7 +67,7 @@ func (b *Bot) forwardMedia(targetID int64, msg *tgbotapi.Message, captionPrefix 
 				File:     tgbotapi.FileID(msg.Sticker.FileID),
 			},
 		}
-		_, _ = b.api.Send(stickerCfg)
+		b.sendAPI("forward_sticker", stickerCfg)
 	} else if msg.Photo != nil {
 		photos := msg.Photo
 		photo := photos[len(photos)-1]
@@ -46,32 +76,32 @@ func (b *Bot) forwardMedia(targetID int64, msg *tgbotapi.Message, captionPrefix 
 		if msg.Caption != "" {
 			photoMsg.Caption += "\n\n" + msg.Caption
 		}
-		_, _ = b.api.Send(photoMsg)
+		b.sendAPI("forward_photo", photoMsg)
 	} else if msg.Voice != nil {
 		voice := tgbotapi.NewVoice(targetID, tgbotapi.FileID(msg.Voice.FileID))
 		voice.Caption = captionPrefix
-		_, _ = b.api.Send(voice)
+		b.sendAPI("forward_voice", voice)
 	} else if msg.Video != nil {
 		video := tgbotapi.NewVideo(targetID, tgbotapi.FileID(msg.Video.FileID))
 		video.Caption = captionPrefix
 		if msg.Caption != "" {
 			video.Caption += "\n\n" + msg.Caption
 		}
-		_, _ = b.api.Send(video)
+		b.sendAPI("forward_video", video)
 	} else if msg.Document != nil {
 		doc := tgbotapi.NewDocument(targetID, tgbotapi.FileID(msg.Document.FileID))
 		doc.Caption = captionPrefix
 		if msg.Caption != "" {
 			doc.Caption += "\n\n" + msg.Caption
 		}
-		_, _ = b.api.Send(doc)
+		b.sendAPI("forward_document", doc)
 	} else if msg.Animation != nil {
 		anim := tgbotapi.NewAnimation(targetID, tgbotapi.FileID(msg.Animation.FileID))
-		_, _ = b.api.Send(anim)
+		b.sendAPI("forward_animation", anim)
 	}
 }
 
-func (b *Bot) isSafeMedia(msg *tgbotapi.Message) (bool, string) {
+func (b *Bot) isSafeMedia(ctx context.Context, msg *tgbotapi.Message) (bool, string) {
 	if !b.moderation.IsEnabled() {
 		return true, ""
 	}
@@ -92,9 +122,20 @@ func (b *Bot) isSafeMedia(msg *tgbotapi.Message) (bool, string) {
 
 	url, err := b.api.GetFileDirectURL(fileID)
 	if err != nil {
+		logger.Warn("Failed to get file direct URL for moderation",
+			zap.Error(err),
+		)
 		return true, ""
 	}
 
-	safe, reason, _ := b.moderation.IsSafe(url)
+	safe, reason, err := b.moderation.IsSafe(ctx, url)
+	if err != nil {
+		logger.Warn("Moderation check failed",
+			zap.Error(err),
+		)
+	}
+	if !safe {
+		metrics.ModerationBlocked.Inc()
+	}
 	return safe, reason
 }

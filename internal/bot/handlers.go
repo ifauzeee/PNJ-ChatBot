@@ -1,6 +1,7 @@
 package bot
 
 import (
+	"context"
 	"fmt"
 	"html"
 
@@ -11,10 +12,10 @@ import (
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
-func (b *Bot) handleStart(msg *tgbotapi.Message) {
+func (b *Bot) handleStart(ctx context.Context, msg *tgbotapi.Message) {
 	telegramID := msg.From.ID
 
-	user, err := b.auth.RegisterUser(telegramID)
+	user, err := b.auth.RegisterUser(ctx, telegramID)
 	if err != nil {
 		logger.Error("❌ Failed to register user", zap.Int64("telegram_id", telegramID), zap.Error(err))
 		b.sendMessage(telegramID, "❌ Terjadi kesalahan. Coba lagi nanti.", nil)
@@ -27,6 +28,9 @@ func (b *Bot) handleStart(msg *tgbotapi.Message) {
 Hai <b>%s</b>! 👋
 
 Bot ini adalah platform anonim khusus untuk <b>mahasiswa Politeknik Negeri Jakarta</b> 🏛️
+
+Support developer bot ini dengan berdonasi di:
+https://saweria.co/ifauzeee/
 
 ━━━━━━━━━━━━━━━━━━━
 ⚖️ <b>DISCLAIMER & LEGAL:</b>
@@ -47,37 +51,37 @@ Ketik /regist dan ikuti proses verifikasi email PNJ kamu.`, html.EscapeString(ms
 		b.sendMessage(telegramID, "👤 *Pilih Gender Kamu:*", nil)
 		kb := GenderKeyboard()
 		b.sendMessage(telegramID, "👇 Silakan pilih:", &kb)
-		_ = b.db.SetUserState(telegramID, models.StateAwaitingGender, "")
+		logIfErr("set_state_awaiting_gender", b.db.SetUserState(ctx, telegramID, models.StateAwaitingGender, ""))
 		return
 	}
 
 	if user.Year == 0 {
 		kb := YearKeyboard()
 		b.sendMessage(telegramID, "🎓 *Pilih Tahun Angkatan Kamu:*", &kb)
-		_ = b.db.SetUserState(telegramID, models.StateAwaitingYear, "")
+		logIfErr("set_state_awaiting_year", b.db.SetUserState(ctx, telegramID, models.StateAwaitingYear, ""))
 		return
 	}
 
 	if string(user.Department) == "" {
 		kb := DepartmentKeyboard()
 		b.sendMessage(telegramID, "🏛️ *Pilih Jurusan Kamu:*\n\nPilih jurusan di bawah ini:", &kb)
-		_ = b.db.SetUserState(telegramID, models.StateAwaitingDept, "")
+		logIfErr("set_state_awaiting_dept", b.db.SetUserState(ctx, telegramID, models.StateAwaitingDept, ""))
 		return
 	}
 
-	b.showMainMenu(telegramID, user)
+	b.showMainMenu(ctx, telegramID, user)
 }
 
-func (b *Bot) showMainMenu(telegramID int64, user *models.User) {
+func (b *Bot) showMainMenu(ctx context.Context, telegramID int64, user *models.User) {
 	if user == nil {
-		user, _ = b.db.GetUser(telegramID)
+		user, _ = b.db.GetUser(ctx, telegramID)
 	}
 	if user == nil {
 		return
 	}
 
-	onlineCount, _ := b.db.GetOnlineUserCount()
-	queueCount, _ := b.chat.GetQueueCount()
+	onlineCount, _ := b.db.GetOnlineUserCount(ctx)
+	queueCount, _ := b.chat.GetQueueCount(ctx)
 
 	menuText := fmt.Sprintf(`🎭 <b>PNJ Anonymous Bot</b>
 
@@ -108,7 +112,7 @@ Antrian chat: <b>%d</b>
 	b.sendMessageHTML(telegramID, menuText, &kb)
 }
 
-func (b *Bot) handleHelp(msg *tgbotapi.Message) {
+func (b *Bot) handleHelp(ctx context.Context, msg *tgbotapi.Message) {
 	helpText := `<b>❓ Panduan PNJ Anonymous Bot</b>
 
 ━━━━━━━━━━━━━━━━━━━
@@ -148,7 +152,7 @@ func (b *Bot) handleHelp(msg *tgbotapi.Message) {
 	b.sendMessageHTML(msg.From.ID, helpText, &kb)
 }
 
-func (b *Bot) handleAbout(msg *tgbotapi.Message) {
+func (b *Bot) handleAbout(ctx context.Context, msg *tgbotapi.Message) {
 	aboutText := `<b>⚖️ Informasi Hukum & Disclaimer</b>
 
 ━━━━━━━━━━━━━━━━━━━
@@ -170,28 +174,28 @@ Dengan menggunakan bot ini, Anda dianggap telah membaca dan menyetujui seluruh k
 	b.sendMessageHTML(msg.From.ID, aboutText, &kb)
 }
 
-func (b *Bot) handleCancel(msg *tgbotapi.Message) {
+func (b *Bot) handleCancel(ctx context.Context, msg *tgbotapi.Message) {
 	telegramID := msg.From.ID
 
-	state, _, _ := b.db.GetUserState(telegramID)
+	state, _, _ := b.db.GetUserState(ctx, telegramID)
 
 	switch state {
 	case models.StateSearching:
-		_ = b.chat.CancelSearch(telegramID)
+		logIfErr("cancel_search_handler", b.chat.CancelSearch(ctx, telegramID))
 		b.sendMessage(telegramID, "❌ Pencarian dibatalkan.", nil)
 	case models.StateAwaitingConfess:
-		_ = b.db.SetUserState(telegramID, models.StateNone, "")
+		logIfErr("set_state_none_cancel_confess", b.db.SetUserState(ctx, telegramID, models.StateNone, ""))
 		b.sendMessage(telegramID, "❌ Confession dibatalkan.", nil)
 	case models.StateAwaitingWhisper, models.StateAwaitingWhisperDept:
-		_ = b.db.SetUserState(telegramID, models.StateNone, "")
+		logIfErr("set_state_none_cancel_whisper", b.db.SetUserState(ctx, telegramID, models.StateNone, ""))
 		b.sendMessage(telegramID, "❌ Whisper dibatalkan.", nil)
 	case models.StateAwaitingReport:
-		_ = b.db.SetUserState(telegramID, models.StateNone, "")
+		logIfErr("set_state_none_cancel_report", b.db.SetUserState(ctx, telegramID, models.StateNone, ""))
 		b.sendMessage(telegramID, "❌ Report dibatalkan.", nil)
 	case models.StateInCircle:
-		b.handleLeaveCircle(msg)
+		b.handleLeaveCircle(ctx, msg)
 	case models.StateAwaitingRoomName, models.StateAwaitingRoomDesc:
-		_ = b.db.SetUserState(telegramID, models.StateNone, "")
+		logIfErr("set_state_none_cancel_room", b.db.SetUserState(ctx, telegramID, models.StateNone, ""))
 		b.sendMessage(telegramID, "❌ Pembuatan circle dibatalkan.", nil)
 	default:
 		b.sendMessage(telegramID, "💡 Tidak ada aksi yang perlu dibatalkan.", nil)

@@ -7,7 +7,10 @@ import (
 	"time"
 
 	"github.com/pnj-anonymous-bot/internal/database"
+	"github.com/pnj-anonymous-bot/internal/logger"
+	"github.com/pnj-anonymous-bot/internal/metrics"
 	"github.com/redis/go-redis/v9"
+	"go.uber.org/zap"
 )
 
 type EvidenceMessage struct {
@@ -20,18 +23,16 @@ type EvidenceMessage struct {
 type EvidenceService struct {
 	db    *database.DB
 	redis *redis.Client
-	ctx   context.Context
 }
 
 func NewEvidenceService(db *database.DB, redisClient *redis.Client) *EvidenceService {
 	return &EvidenceService{
 		db:    db,
 		redis: redisClient,
-		ctx:   context.Background(),
 	}
 }
 
-func (s *EvidenceService) LogMessage(sessionID int64, senderID int64, content string, msgType string) {
+func (s *EvidenceService) LogMessage(ctx context.Context, sessionID int64, senderID int64, content string, msgType string) {
 	key := fmt.Sprintf("chat_evidence:%d", sessionID)
 
 	msg := EvidenceMessage{
@@ -41,19 +42,33 @@ func (s *EvidenceService) LogMessage(sessionID int64, senderID int64, content st
 		SentAt:   time.Now().Unix(),
 	}
 
-	raw, _ := json.Marshal(msg)
+	raw, err := json.Marshal(msg)
+	if err != nil {
+		logger.Warn("Failed to marshal evidence message",
+			zap.Int64("session_id", sessionID),
+			zap.Error(err),
+		)
+		return
+	}
 
 	pipe := s.redis.Pipeline()
-	pipe.RPush(s.ctx, key, raw)
-	pipe.LTrim(s.ctx, key, -20, -1)
-	pipe.Expire(s.ctx, key, 24*time.Hour)
-	_, _ = pipe.Exec(s.ctx)
+	pipe.RPush(ctx, key, raw)
+	pipe.LTrim(ctx, key, -20, -1)
+	pipe.Expire(ctx, key, 24*time.Hour)
+	if _, err := pipe.Exec(ctx); err != nil {
+		metrics.RedisErrors.WithLabelValues("evidence_log").Inc()
+		logger.Warn("Failed to log evidence message",
+			zap.Int64("session_id", sessionID),
+			zap.Error(err),
+		)
+	}
 }
 
-func (s *EvidenceService) GetEvidence(sessionID int64) (string, error) {
+func (s *EvidenceService) GetEvidence(ctx context.Context, sessionID int64) (string, error) {
 	key := fmt.Sprintf("chat_evidence:%d", sessionID)
-	items, err := s.redis.LRange(s.ctx, key, 0, -1).Result()
+	items, err := s.redis.LRange(ctx, key, 0, -1).Result()
 	if err != nil {
+		metrics.RedisErrors.WithLabelValues("evidence_get").Inc()
 		return "", err
 	}
 
@@ -71,4 +86,15 @@ func (s *EvidenceService) GetEvidence(sessionID int64) (string, error) {
 	}
 
 	return evidence, nil
+}
+
+func (s *EvidenceService) ClearEvidence(ctx context.Context, sessionID int64) {
+	key := fmt.Sprintf("chat_evidence:%d", sessionID)
+	if err := s.redis.Del(ctx, key).Err(); err != nil {
+		metrics.RedisErrors.WithLabelValues("evidence_clear").Inc()
+		logger.Warn("Failed to clear evidence",
+			zap.Int64("session_id", sessionID),
+			zap.Error(err),
+		)
+	}
 }

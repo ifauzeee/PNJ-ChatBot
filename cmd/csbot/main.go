@@ -1,6 +1,10 @@
 package main
 
 import (
+	"context"
+	"os/signal"
+	"syscall"
+
 	"github.com/pnj-anonymous-bot/internal/config"
 	"github.com/pnj-anonymous-bot/internal/csbot"
 	"github.com/pnj-anonymous-bot/internal/database"
@@ -29,5 +33,8 @@ func main() {
 		logger.Fatal("❌ Failed to initialize CS Bot", zap.Error(err))
 	}
 
-	bot.Start()
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
+
+	bot.Start(ctx)
 }

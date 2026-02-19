@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/pnj-anonymous-bot/internal/database"
@@ -15,7 +16,7 @@ func NewGamificationService(db *database.DB) *GamificationService {
 	return &GamificationService{db: db}
 }
 
-func (s *GamificationService) RewardActivity(telegramID int64, activityType string) (level int, leveledUp bool, pointsEarned int, expEarned int, err error) {
+func (s *GamificationService) RewardActivity(ctx context.Context, telegramID int64, activityType string) (level int, leveledUp bool, pointsEarned int, expEarned int, err error) {
 	switch activityType {
 	case "chat_message":
 		pointsEarned = 1
@@ -36,14 +37,14 @@ func (s *GamificationService) RewardActivity(telegramID int64, activityType stri
 		return 0, false, 0, 0, fmt.Errorf("unknown activity type")
 	}
 
-	level, leveledUp, err = s.db.AddPointsAndExp(telegramID, pointsEarned, expEarned)
+	level, leveledUp, err = s.db.AddPointsAndExp(ctx, telegramID, pointsEarned, expEarned)
 	return level, leveledUp, pointsEarned, expEarned, err
 }
 
-func (s *GamificationService) UpdateStreak(telegramID int64) (newStreak int, bonus bool, err error) {
-	return s.db.UpdateDailyStreak(telegramID)
+func (s *GamificationService) UpdateStreak(ctx context.Context, telegramID int64) (newStreak int, bonus bool, err error) {
+	return s.db.UpdateDailyStreak(ctx, telegramID)
 }
 
-func (s *GamificationService) GetLeaderboard() ([]models.User, error) {
-	return s.db.GetLeaderboard(10)
+func (s *GamificationService) GetLeaderboard(ctx context.Context) ([]models.User, error) {
+	return s.db.GetLeaderboard(ctx, 10)
 }
