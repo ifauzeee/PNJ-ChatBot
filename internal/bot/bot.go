@@ -22,7 +22,6 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.uber.org/zap"
 
-
 	"github.com/getsentry/sentry-go"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
@@ -156,10 +155,10 @@ func (b *Bot) registerHandlers() {
 }
 
 type HealthResponse struct {
-	Status    string `json:"status"`
-	Database  string `json:"database"`
-	Redis     string `json:"redis"`
-	System    struct {
+	Status   string `json:"status"`
+	Database string `json:"database"`
+	Redis    string `json:"redis"`
+	System   struct {
 		UptimeSeconds int64  `json:"uptime_seconds"`
 		HeapAlloc     uint64 `json:"heap_alloc"`
 		StackInUse    uint64 `json:"stack_in_use"`
@@ -197,9 +196,9 @@ func (b *Bot) startHealthServer(ctx context.Context) {
 		}
 
 		health := HealthResponse{
-			Status:   "ok",
-			Database: dbStatus,
-			Redis:    redisStatus,
+			Status:    "ok",
+			Database:  dbStatus,
+			Redis:     redisStatus,
 			Timestamp: time.Now().Format(time.RFC3339),
 		}
 		health.System.UptimeSeconds = int64(time.Since(b.startedAt).Seconds())
