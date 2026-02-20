@@ -16,8 +16,6 @@ func (b *Bot) handleCallback(ctx context.Context, callback *tgbotapi.CallbackQue
 	telegramID := callback.From.ID
 	data := callback.Data
 
-	defer b.answerCallback(callback.ID, "")
-
 	parts := strings.SplitN(data, ":", 2)
 	if len(parts) < 2 {
 		return
@@ -29,6 +27,8 @@ func (b *Bot) handleCallback(ctx context.Context, callback *tgbotapi.CallbackQue
 	if handler, exists := b.callbacks[category]; exists {
 		metrics.CallbacksTotal.WithLabelValues(category).Inc()
 		handler(ctx, telegramID, value, callback)
+	} else {
+		b.answerCallback(callback.ID, "")
 	}
 }
 

@@ -22,14 +22,6 @@ func DefaultRetryConfig() RetryConfig {
 	}
 }
 
-func BroadcastRetryConfig() RetryConfig {
-	return RetryConfig{
-		MaxAttempts: 2,
-		BaseDelay:   200 * time.Millisecond,
-		MaxDelay:    2 * time.Second,
-	}
-}
-
 func Retry(ctx context.Context, cfg RetryConfig, fn func() error) error {
 	var lastErr error
 	for attempt := 0; attempt < cfg.MaxAttempts; attempt++ {

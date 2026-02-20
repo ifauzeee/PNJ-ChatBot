@@ -2,7 +2,6 @@ package validation
 
 import (
 	"fmt"
-	"regexp"
 	"strings"
 	"unicode/utf8"
 )
@@ -50,20 +49,6 @@ func SanitizeText(text string) string {
 		return r
 	}, text)
 	return cleaned
-}
-
-var pnjEmailRegex = regexp.MustCompile(`^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]*pnj\.ac\.id$`)
-
-func IsValidPNJEmail(email string) bool {
-	email = strings.TrimSpace(strings.ToLower(email))
-	if len(email) > 254 {
-		return false
-	}
-	return pnjEmailRegex.MatchString(email)
-}
-
-func ValidateCallbackData(data string) bool {
-	return len(data) > 0 && len(data) <= 64
 }
 
 func ContainsOnlyPrintable(text string) bool {

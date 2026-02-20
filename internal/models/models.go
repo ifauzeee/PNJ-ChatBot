@@ -217,13 +217,6 @@ type BlockedUser struct {
 	CreatedAt time.Time `json:"created_at" db:"created_at"`
 }
 
-type UserStats struct {
-	TotalChats       int `json:"total_chats"`
-	TotalConfessions int `json:"total_confessions"`
-	TotalReactions   int `json:"total_reactions"`
-	DaysActive       int `json:"days_active"`
-}
-
 type Whisper struct {
 	ID           int64     `json:"id" db:"id"`
 	SenderID     int64     `json:"sender_id" db:"sender_id"`

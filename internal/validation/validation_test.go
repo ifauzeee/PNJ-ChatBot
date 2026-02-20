@@ -61,27 +61,6 @@ func TestSanitizeText(t *testing.T) {
 	}
 }
 
-func TestIsValidPNJEmail(t *testing.T) {
-	tests := []struct {
-		email string
-		valid bool
-	}{
-		{"student@pnj.ac.id", true},
-		{"user.name@student.pnj.ac.id", true},
-		{"user@mhs.pnj.ac.id", true},
-		{"user@gmail.com", false},
-		{"user@pnj.ac.id.evil.com", false},
-		{"", false},
-		{strings.Repeat("a", 300) + "@pnj.ac.id", false},
-	}
-
-	for _, tt := range tests {
-		result := IsValidPNJEmail(tt.email)
-		if result != tt.valid {
-			t.Errorf("IsValidPNJEmail(%q) = %v, want %v", tt.email, result, tt.valid)
-		}
-	}
-}
 
 func TestContainsOnlyPrintable(t *testing.T) {
 	if !ContainsOnlyPrintable("Hello World\nNew line") {

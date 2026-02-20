@@ -86,11 +86,6 @@ var (
 		Help: "Total circle joins.",
 	})
 
-	CircleLeavesTotal = promauto.NewCounter(prometheus.CounterOpts{
-		Name: "pnj_bot_circle_leaves_total",
-		Help: "Total circle leaves.",
-	})
-
 	RateLimitHitsTotal = promauto.NewCounterVec(prometheus.CounterOpts{
 		Name: "pnj_bot_rate_limit_hits_total",
 		Help: "Total rate limit hits by action.",
@@ -120,16 +115,6 @@ var (
 		Name: "pnj_bot_redis_errors_total",
 		Help: "Total Redis operation errors.",
 	}, []string{"operation"})
-
-	ActiveUsersGauge = promauto.NewGauge(prometheus.GaugeOpts{
-		Name: "pnj_bot_active_users",
-		Help: "Number of currently active users (in chat or searching).",
-	})
-
-	QueueSizeGauge = promauto.NewGauge(prometheus.GaugeOpts{
-		Name: "pnj_bot_search_queue_size",
-		Help: "Current number of users in search queue.",
-	})
 
 	BroadcastDuration = promauto.NewHistogram(prometheus.HistogramOpts{
 		Name:    "pnj_bot_broadcast_duration_seconds",
