@@ -25,7 +25,7 @@ type DB struct {
 func New(cfg *config.Config) (*DB, error) {
 	dbType := strings.ToLower(strings.TrimSpace(cfg.DBType))
 	if dbType == "" {
-		dbType = "sqlite"
+		dbType = "postgres"
 	}
 
 	var db *sqlx.DB
