@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"os"
 	"strings"
 	"time"
 
@@ -20,8 +19,8 @@ type RedisService struct {
 	cb     *resilience.CircuitBreaker
 }
 
-func NewRedisService() *RedisService {
-	url := os.Getenv("REDIS_URL")
+func NewRedisService(redisURL string) *RedisService {
+	url := redisURL
 	if url == "" {
 		url = "localhost:6379"
 	}
@@ -108,19 +107,6 @@ func (r *RedisService) AddToQueue(ctx context.Context, telegramID int64, val int
 		}
 		return nil
 	})
-}
-
-func (r *RedisService) GetFromQueue(ctx context.Context) ([]byte, error) {
-	var result []byte
-	err := r.cb.Execute(func() error {
-		var err error
-		result, err = r.client.LPop(ctx, "chat_queue").Bytes()
-		if err != nil && err != redis.Nil {
-			metrics.RedisErrors.WithLabelValues("queue_pop").Inc()
-		}
-		return err
-	})
-	return result, err
 }
 
 func (r *RedisService) RemoveFromQueue(ctx context.Context, telegramID int64) error {

@@ -216,7 +216,7 @@ func TestRoomSlugGeneration(t *testing.T) {
 func TestAuthServiceDuplicateRegistration(t *testing.T) {
 	db := setupTestDB(t)
 	cfg := &config.Config{OTPLength: 6, OTPExpiryMinutes: 10}
-	authSvc := NewAuthService(db, &MockEmailSender{}, cfg)
+	authSvc := NewAuthService(db, &MockEmailSender{}, cfg, NewRedisService("localhost:6379").GetClient())
 	ctx := context.Background()
 
 	userID := int64(13001)
@@ -237,7 +237,7 @@ func TestAuthServiceDuplicateRegistration(t *testing.T) {
 func TestAuthServiceIsVerified(t *testing.T) {
 	db := setupTestDB(t)
 	cfg := &config.Config{OTPLength: 6, OTPExpiryMinutes: 10}
-	authSvc := NewAuthService(db, &MockEmailSender{}, cfg)
+	authSvc := NewAuthService(db, &MockEmailSender{}, cfg, NewRedisService("localhost:6379").GetClient())
 	ctx := context.Background()
 
 	userID := int64(13002)
@@ -255,7 +255,7 @@ func TestAuthServiceIsVerified(t *testing.T) {
 func TestAuthServiceIsBanned(t *testing.T) {
 	db := setupTestDB(t)
 	cfg := &config.Config{OTPLength: 6, OTPExpiryMinutes: 10}
-	authSvc := NewAuthService(db, &MockEmailSender{}, cfg)
+	authSvc := NewAuthService(db, &MockEmailSender{}, cfg, NewRedisService("localhost:6379").GetClient())
 	ctx := context.Background()
 
 	userID := int64(13003)
@@ -274,7 +274,7 @@ func TestAuthServiceStuEmail(t *testing.T) {
 	db := setupTestDB(t)
 	cfg := &config.Config{OTPLength: 6, OTPExpiryMinutes: 10}
 	mockEmail := &MockEmailSender{}
-	authSvc := NewAuthService(db, mockEmail, cfg)
+	authSvc := NewAuthService(db, mockEmail, cfg, NewRedisService("localhost:6379").GetClient())
 	ctx := context.Background()
 
 	userID := int64(13004)
@@ -293,7 +293,7 @@ func TestAuthServiceEmailSenderError(t *testing.T) {
 	db := setupTestDB(t)
 	cfg := &config.Config{OTPLength: 6, OTPExpiryMinutes: 10}
 	mockEmail := &MockEmailSender{Err: errMockSend}
-	authSvc := NewAuthService(db, mockEmail, cfg)
+	authSvc := NewAuthService(db, mockEmail, cfg, NewRedisService("localhost:6379").GetClient())
 	ctx := context.Background()
 
 	userID := int64(13005)

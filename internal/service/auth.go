@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/pnj-anonymous-bot/internal/config"
@@ -13,16 +12,12 @@ import (
 	"github.com/pnj-anonymous-bot/internal/logger"
 	"github.com/pnj-anonymous-bot/internal/metrics"
 	"github.com/pnj-anonymous-bot/internal/models"
+	"github.com/redis/go-redis/v9"
 	"go.uber.org/zap"
 )
 
 type EmailSender interface {
 	SendOTP(ctx context.Context, to, code string) error
-}
-
-type otpAttempt struct {
-	count    int
-	lockedAt time.Time
 }
 
 const (
@@ -31,17 +26,18 @@ const (
 )
 
 type AuthService struct {
-	db          *database.DB
-	email       EmailSender
-	cfg         *config.Config
-	otpAttempts sync.Map
+	db    *database.DB
+	email EmailSender
+	cfg   *config.Config
+	redis *redis.Client
 }
 
-func NewAuthService(db *database.DB, emailSender EmailSender, cfg *config.Config) *AuthService {
+func NewAuthService(db *database.DB, emailSender EmailSender, cfg *config.Config, redisClient *redis.Client) *AuthService {
 	return &AuthService{
 		db:    db,
 		email: emailSender,
 		cfg:   cfg,
+		redis: redisClient,
 	}
 }
 
@@ -102,7 +98,7 @@ func (s *AuthService) InitiateVerification(ctx context.Context, telegramID int64
 func (s *AuthService) VerifyOTP(ctx context.Context, telegramID int64, code string) (bool, error) {
 	code = strings.TrimSpace(code)
 
-	if locked, remaining := s.isOTPLocked(telegramID); locked {
+	if locked, remaining := s.isOTPLocked(ctx, telegramID); locked {
 		return false, fmt.Errorf("terlalu banyak percobaan gagal. Coba lagi dalam %d menit", int(remaining.Minutes())+1)
 	}
 
@@ -111,11 +107,11 @@ func (s *AuthService) VerifyOTP(ctx context.Context, telegramID int64, code stri
 		return false, err
 	}
 	if !valid {
-		s.recordOTPFailure(telegramID)
+		s.recordOTPFailure(ctx, telegramID)
 		return false, nil
 	}
 
-	s.otpAttempts.Delete(telegramID)
+	s.clearOTPLock(ctx, telegramID)
 
 	if err := s.db.UpdateUserVerified(ctx, telegramID, true); err != nil {
 		return false, err
@@ -137,34 +133,40 @@ func (s *AuthService) VerifyOTP(ctx context.Context, telegramID int64, code stri
 	return true, nil
 }
 
-func (s *AuthService) isOTPLocked(telegramID int64) (bool, time.Duration) {
-	val, ok := s.otpAttempts.Load(telegramID)
-	if !ok {
-		return false, 0
-	}
-	a := val.(*otpAttempt)
-	if a.count >= maxOTPAttempts && !a.lockedAt.IsZero() {
-		remaining := otpLockDuration - time.Since(a.lockedAt)
-		if remaining > 0 {
-			return true, remaining
-		}
-
-		s.otpAttempts.Delete(telegramID)
+func (s *AuthService) isOTPLocked(ctx context.Context, telegramID int64) (bool, time.Duration) {
+	key := fmt.Sprintf("otp_lockout:%d", telegramID)
+	ttl, err := s.redis.TTL(ctx, key).Result()
+	if err == nil && ttl > 0 {
+		return true, ttl
 	}
 	return false, 0
 }
 
-func (s *AuthService) recordOTPFailure(telegramID int64) {
-	val, _ := s.otpAttempts.LoadOrStore(telegramID, &otpAttempt{})
-	a := val.(*otpAttempt)
-	a.count++
-	if a.count >= maxOTPAttempts {
-		a.lockedAt = time.Now()
-		logger.Warn("OTP brute-force lockout triggered",
+func (s *AuthService) recordOTPFailure(ctx context.Context, telegramID int64) {
+	key := fmt.Sprintf("otp_attempts:%d", telegramID)
+	count, err := s.redis.Incr(ctx, key).Result()
+	if err != nil {
+		return
+	}
+	
+	if count == 1 {
+		s.redis.Expire(ctx, key, 15*time.Minute)
+	}
+
+	if count >= int64(maxOTPAttempts) {
+		lockKey := fmt.Sprintf("otp_lockout:%d", telegramID)
+		s.redis.Set(ctx, lockKey, "locked", otpLockDuration)
+		s.redis.Del(ctx, key)
+		logger.Warn("OTP brute-force lockout triggered (Redis)",
 			zap.Int64("user_id", telegramID),
-			zap.Int("attempts", a.count),
+			zap.Int64("attempts", count),
 		)
 	}
+}
+
+func (s *AuthService) clearOTPLock(ctx context.Context, telegramID int64) {
+	s.redis.Del(ctx, fmt.Sprintf("otp_lockout:%d", telegramID))
+	s.redis.Del(ctx, fmt.Sprintf("otp_attempts:%d", telegramID))
 }
 
 func (s *AuthService) IsVerified(ctx context.Context, telegramID int64) (bool, error) {

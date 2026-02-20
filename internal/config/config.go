@@ -32,6 +32,8 @@ type Config struct {
 	DBPassword string
 	DBName     string
 
+	RedisURL string
+
 	OTPLength        int
 	OTPExpiryMinutes int
 
@@ -77,6 +79,7 @@ func Load() *Config {
 		DBUser:                getEnv("DB_USER", "postgres"),
 		DBPassword:            getEnv("DB_PASSWORD", ""),
 		DBName:                getEnv("DB_NAME", "pnjbot"),
+		RedisURL:              getEnv("REDIS_URL", "localhost:6379"),
 		OTPLength:             getEnvInt("OTP_LENGTH", 6),
 		OTPExpiryMinutes:      getEnvInt("OTP_EXPIRY_MINUTES", 10),
 		MaxSearchPerMinute:    getEnvInt("MAX_SEARCH_PER_MINUTE", 5),

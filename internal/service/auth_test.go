@@ -26,7 +26,7 @@ func TestAuthServiceVerificationFlow(t *testing.T) {
 		OTPExpiryMinutes: 10,
 	}
 	mockEmail := &MockEmailSender{}
-	authSvc := NewAuthService(db, mockEmail, cfg)
+	authSvc := NewAuthService(db, mockEmail, cfg, NewRedisService("localhost:6379").GetClient())
 	ctx := context.Background()
 
 	userID := int64(9001)
@@ -68,7 +68,7 @@ func TestAuthServiceVerificationFlow(t *testing.T) {
 func TestAuthServiceInvalidOTP(t *testing.T) {
 	db := setupTestDB(t)
 	cfg := &config.Config{OTPLength: 6, OTPExpiryMinutes: 10}
-	authSvc := NewAuthService(db, &MockEmailSender{}, cfg)
+	authSvc := NewAuthService(db, &MockEmailSender{}, cfg, NewRedisService("localhost:6379").GetClient())
 	ctx := context.Background()
 
 	userID := int64(9002)
@@ -86,7 +86,7 @@ func TestAuthServiceInvalidOTP(t *testing.T) {
 
 func TestAuthServiceRejectsInvalidDomain(t *testing.T) {
 	db := setupTestDB(t)
-	authSvc := NewAuthService(db, &MockEmailSender{}, &config.Config{})
+	authSvc := NewAuthService(db, &MockEmailSender{}, &config.Config{}, NewRedisService("localhost:6379").GetClient())
 	ctx := context.Background()
 
 	err := authSvc.InitiateVerification(ctx, 9003, "test@gmail.com")

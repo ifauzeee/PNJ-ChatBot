@@ -76,7 +76,7 @@ func setupTestRedis(t *testing.T) *miniredis.Miniredis {
 func TestChatServiceMatch(t *testing.T) {
 	db := setupTestDB(t)
 	mr := setupTestRedis(t)
-	redisSvc := NewRedisService()
+	redisSvc := NewRedisService(os.Getenv("REDIS_URL"))
 	chatSvc := NewChatService(db, redisSvc, 5)
 	ctx := context.Background()
 
@@ -117,7 +117,7 @@ func TestChatServiceMatch(t *testing.T) {
 func TestChatServiceStop(t *testing.T) {
 	db := setupTestDB(t)
 	mr := setupTestRedis(t)
-	redisSvc := NewRedisService()
+	redisSvc := NewRedisService(os.Getenv("REDIS_URL"))
 	chatSvc := NewChatService(db, redisSvc, 5)
 	ctx := context.Background()
 
@@ -147,7 +147,7 @@ func TestChatServiceStop(t *testing.T) {
 func TestChatServiceMatchFilters(t *testing.T) {
 	db := setupTestDB(t)
 	mr := setupTestRedis(t)
-	redisSvc := NewRedisService()
+	redisSvc := NewRedisService(os.Getenv("REDIS_URL"))
 	chatSvc := NewChatService(db, redisSvc, 5)
 	ctx := context.Background()
 
@@ -173,7 +173,7 @@ func TestChatServiceMatchFilters(t *testing.T) {
 func TestChatServiceQueueTimeout(t *testing.T) {
 	db := setupTestDB(t)
 	mr := setupTestRedis(t)
-	redisSvc := NewRedisService()
+	redisSvc := NewRedisService(os.Getenv("REDIS_URL"))
 	chatSvc := NewChatService(db, redisSvc, 5)
 	ctx := context.Background()
 
@@ -224,7 +224,7 @@ func TestChatServiceQueueTimeout(t *testing.T) {
 func TestEvidenceService(t *testing.T) {
 	db := setupTestDB(t)
 	mr := setupTestRedis(t)
-	redisClient := NewRedisService().GetClient()
+	redisClient := NewRedisService(os.Getenv("REDIS_URL")).GetClient()
 	evidenceSvc := NewEvidenceService(db, redisClient)
 	ctx := context.Background()
 
@@ -251,18 +251,18 @@ func TestEvidenceService(t *testing.T) {
 func TestEvidenceServiceCap(t *testing.T) {
 	db := setupTestDB(t)
 	_ = setupTestRedis(t)
-	redisClient := NewRedisService().GetClient()
+	redisClient := NewRedisService(os.Getenv("REDIS_URL")).GetClient()
 	evidenceSvc := NewEvidenceService(db, redisClient)
 	ctx := context.Background()
 
 	sessionID := int64(502)
-	for i := 0; i < 30; i++ {
+	for i := 0; i < 110; i++ {
 		evidenceSvc.LogMessage(ctx, sessionID, 101, strings.Repeat("a", i), "text")
 	}
 
 	evidence, _ := evidenceSvc.GetEvidence(ctx, sessionID)
 	lines := strings.Split(strings.TrimSpace(evidence), "\n")
-	if len(lines) > 20 {
-		t.Errorf("Expected max 20 lines, got %d", len(lines))
+	if len(lines) > 100 {
+		t.Errorf("Expected max 100 lines, got %d", len(lines))
 	}
 }
