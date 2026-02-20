@@ -30,7 +30,7 @@ func createProfanityRegex(words []string) *regexp.Regexp {
 	for _, w := range words {
 		escapedWords = append(escapedWords, regexp.QuoteMeta(w))
 	}
-	pattern := `(?i)\b(` + strings.Join(escapedWords, "|") + `)\b`
+	pattern := `(?i)(` + strings.Join(escapedWords, "|") + `)`
 	return regexp.MustCompile(pattern)
 }
 

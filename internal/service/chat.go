@@ -51,7 +51,7 @@ func (s *ChatService) SearchPartner(ctx context.Context, telegramID int64, prefe
 	}
 
 	queueKey := "chat_queue"
-	items, err := s.redis.GetClient().LRange(ctx, queueKey, 0, -1).Result()
+	items, err := s.redis.GetClient().LRange(ctx, queueKey, 0, 99).Result()
 	if err != nil {
 		return 0, fmt.Errorf("gagal membaca antrian: %w", err)
 	}

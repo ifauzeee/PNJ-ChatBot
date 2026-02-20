@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
 	"runtime"
 	"strings"
 	"sync"
@@ -286,8 +287,13 @@ func (b *CSBot) startHealthServer(ctx context.Context) {
 		_ = json.NewEncoder(w).Encode(health)
 	})
 
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
+
 	server := &http.Server{
-		Addr:         ":8080",
+		Addr:         ":" + port,
 		Handler:      mux,
 		ReadTimeout:  5 * time.Second,
 		WriteTimeout: 10 * time.Second,
@@ -304,7 +310,7 @@ func (b *CSBot) startHealthServer(ctx context.Context) {
 		}
 	}()
 
-	logger.Info("🏥 CS Health check server listening on :8080")
+	logger.Info("🏥 CS Health check server listening on :"+port)
 	if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		logger.Error("⚠️ CS Health check server error", zap.Error(err))
 	}

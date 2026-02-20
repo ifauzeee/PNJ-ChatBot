@@ -5,8 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
 	"runtime"
-	"strconv"
 	"sync"
 	"time"
 
@@ -36,18 +36,18 @@ var (
 		Name:    "pnj_bot_update_process_duration_seconds",
 		Help:    "Time spent processing a Telegram update in worker pool.",
 		Buckets: prometheus.ExponentialBuckets(0.005, 2, 12),
-	}, []string{"user_id", "update_type"})
+	}, []string{"update_type"})
 
-	userLockWaitSeconds = promauto.NewHistogramVec(prometheus.HistogramOpts{
+	userLockWaitSeconds = promauto.NewHistogram(prometheus.HistogramOpts{
 		Name:    "pnj_bot_user_lock_wait_seconds",
 		Help:    "Wait time to acquire per-user lock before update processing.",
 		Buckets: prometheus.ExponentialBuckets(0.0005, 2, 12),
-	}, []string{"user_id"})
+	})
 
-	userLockContentionTotal = promauto.NewCounterVec(prometheus.CounterOpts{
+	userLockContentionTotal = promauto.NewCounter(prometheus.CounterOpts{
 		Name: "pnj_bot_user_lock_contention_total",
 		Help: "Number of updates waiting for contested per-user locks.",
-	}, []string{"user_id"})
+	})
 )
 
 type Bot struct {
@@ -82,14 +82,14 @@ func New(cfg *config.Config, db *database.DB) (*Bot, error) {
 	api.Debug = cfg.BotDebug
 
 	emailSender := email.NewSender(cfg)
-	redisSvc := service.NewRedisService()
+	redisSvc := service.NewRedisService(cfg.RedisURL)
 
 	bot := &Bot{
 		api:          api,
 		cfg:          cfg,
 		db:           db,
 		redisSvc:     redisSvc,
-		auth:         service.NewAuthService(db, emailSender, cfg),
+		auth:         service.NewAuthService(db, emailSender, cfg, redisSvc.GetClient()),
 		chat:         service.NewChatService(db, redisSvc, cfg.MaxSearchPerMinute),
 		confession:   service.NewConfessionService(db, cfg),
 		profile:      service.NewProfileService(db, cfg),
@@ -251,8 +251,13 @@ func (b *Bot) startHealthServer(ctx context.Context) {
 
 	mux.Handle("/metrics", promhttp.Handler())
 
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
+
 	server := &http.Server{
-		Addr:         ":8080",
+		Addr:         ":" + port,
 		Handler:      mux,
 		ReadTimeout:  5 * time.Second,
 		WriteTimeout: 10 * time.Second,
@@ -268,7 +273,7 @@ func (b *Bot) startHealthServer(ctx context.Context) {
 		}
 	}()
 
-	logger.Info("🏥 Health check server listening on :8080")
+	logger.Info("🏥 Health check server listening on :"+port)
 	if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		logger.Error("⚠️ Health check server error", zap.Error(err))
 	}
@@ -444,15 +449,6 @@ intakeLoop:
 
 	updateQueueDepthGauge.Set(0)
 
-	logger.Info("⏳ Closing external connections...")
-	if err := b.redisSvc.Close(); err != nil {
-		logger.Warn("Redis close error", zap.Error(err))
-	}
-	if err := b.db.Close(); err != nil {
-		logger.Warn("Database close error", zap.Error(err))
-	}
-	logger.Info("✅ External connections closed")
-
 	logger.Info("🛑 Bot shutdown completed")
 
 	return nil
@@ -464,7 +460,6 @@ func (b *Bot) handleUpdate(update tgbotapi.Update) {
 
 	startedAt := time.Now()
 	userID, hasUser := b.extractUpdateUserID(update)
-	userLabel := updateMetricUserLabel(userID, hasUser)
 	updateType := classifyUpdate(update)
 
 	defer func() {
@@ -472,7 +467,7 @@ func (b *Bot) handleUpdate(update tgbotapi.Update) {
 			logger.Error("❌ Panic recovered", zap.Any("recover", r))
 			sentry.CurrentHub().Recover(r)
 		}
-		updateProcessDurationSeconds.WithLabelValues(userLabel, updateType).Observe(time.Since(startedAt).Seconds())
+		updateProcessDurationSeconds.WithLabelValues(updateType).Observe(time.Since(startedAt).Seconds())
 	}()
 
 	if hasUser {
@@ -480,19 +475,26 @@ func (b *Bot) handleUpdate(update tgbotapi.Update) {
 		lockWaitStart := time.Now()
 		lock.Lock()
 		lockWait := time.Since(lockWaitStart)
-		userLockWaitSeconds.WithLabelValues(userLabel).Observe(lockWait.Seconds())
+		userLockWaitSeconds.Observe(lockWait.Seconds())
 		if lockWait > time.Millisecond {
-			userLockContentionTotal.WithLabelValues(userLabel).Inc()
+			userLockContentionTotal.Inc()
 		}
 		defer lock.Unlock()
 
-		streak, bonus, errStreak := b.gamification.UpdateStreak(ctx, userID)
-		if errStreak == nil {
-			if bonus {
-				_, _, _, _, _ = b.gamification.RewardActivity(ctx, userID, "streak_bonus")
-				b.sendMessageHTML(userID, fmt.Sprintf("🔥 <b>STREAK LANJUT!</b>\nKamu sudah aktif selama <b>%d hari</b> berturut-turut! Dapat bonus poin dan exp.", streak), nil)
-			} else {
-				_, _, _, _, _ = b.gamification.RewardActivity(ctx, userID, "daily_login")
+		// Only check streak once per user per day using Redis flag
+		streakKey := fmt.Sprintf("streak_checked:%d", userID)
+		alreadyChecked, _ := b.redisSvc.GetClient().Exists(ctx, streakKey).Result()
+		if alreadyChecked == 0 {
+			streak, bonus, errStreak := b.gamification.UpdateStreak(ctx, userID)
+			if errStreak == nil {
+				// Mark as checked for today (expire at end of day)
+				b.redisSvc.GetClient().Set(ctx, streakKey, "1", 24*time.Hour)
+				if bonus {
+					_, _, _, _, _ = b.gamification.RewardActivity(ctx, userID, "streak_bonus")
+					b.sendMessageHTML(userID, fmt.Sprintf("🔥 <b>STREAK LANJUT!</b>\nKamu sudah aktif selama <b>%d hari</b> berturut-turut! Dapat bonus poin dan exp.", streak), nil)
+				} else {
+					_, _, _, _, _ = b.gamification.RewardActivity(ctx, userID, "daily_login")
+				}
 			}
 		}
 	}
@@ -512,13 +514,6 @@ func (b *Bot) handleUpdate(update tgbotapi.Update) {
 	}
 
 	b.handleMessage(ctx, update.Message)
-}
-
-func updateMetricUserLabel(userID int64, hasUser bool) string {
-	if !hasUser {
-		return "unknown"
-	}
-	return strconv.FormatInt(userID, 10)
 }
 
 func classifyUpdate(update tgbotapi.Update) string {

@@ -216,7 +216,12 @@ func (b *Bot) handleChatMessage(ctx context.Context, msg *tgbotapi.Message) {
 			b.sendMessage(telegramID, "⚠️ *Peringatan:* Pesan kamu mengandung kata-kata yang tidak pantas dan telah disensor.", nil)
 		}
 		b.sendMessage(partnerID, escapeMarkdown(text), nil)
-		b.processReward(ctx, telegramID, "chat_message")
+
+		rewardKey := fmt.Sprintf("reward_cooldown:%d", telegramID)
+		allowed, _ := b.redisSvc.GetClient().SetNX(ctx, rewardKey, "1", 10*time.Second).Result()
+		if allowed {
+			b.processReward(ctx, telegramID, "chat_message")
+		}
 
 	case msg.Sticker != nil, msg.Photo != nil, msg.Animation != nil:
 		if safe, reason := b.isSafeMedia(ctx, msg); !safe {

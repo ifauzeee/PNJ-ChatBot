@@ -37,6 +37,7 @@ func main() {
 	if err != nil {
 		logger.Fatal("❌ Failed to connect to database", zap.Error(err))
 	}
+	defer db.Close()
 
 	csService := service.NewCSService(db)
 	bot, err := csbot.New(cfg, csService)

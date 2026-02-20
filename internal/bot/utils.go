@@ -39,7 +39,7 @@ func (b *Bot) deleteMessage(chatID int64, messageID int, operation string) {
 func maskEmail(emailAddr string) string {
 	parts := strings.Split(emailAddr, "@")
 	if len(parts) != 2 {
-		return emailAddr
+		return "***"
 	}
 
 	name := parts[0]
@@ -51,10 +51,10 @@ func maskEmail(emailAddr string) string {
 
 func escapeMarkdown(text string) string {
 	replacer := strings.NewReplacer(
-		"*", "\\*",
-		"_", "\\_",
-		"[", "\\[",
-		"`", "\\`",
+		"_", "\\_", "*", "\\*", "[", "\\[", "]", "\\]", "(", "\\(",
+		")", "\\)", "~", "\\~", "`", "\\`", ">", "\\>", "#", "\\#",
+		"+", "\\+", "-", "\\-", "=", "\\=", "|", "\\|", "{", "\\{",
+		"}", "\\}", ".", "\\.", "!", "\\!",
 	)
 	return replacer.Replace(text)
 }

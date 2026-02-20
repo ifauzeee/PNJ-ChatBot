@@ -53,8 +53,8 @@ func (s *EvidenceService) LogMessage(ctx context.Context, sessionID int64, sende
 
 	pipe := s.redis.Pipeline()
 	pipe.RPush(ctx, key, raw)
-	pipe.LTrim(ctx, key, -20, -1)
-	pipe.Expire(ctx, key, 24*time.Hour)
+	pipe.LTrim(ctx, key, -100, -1)
+	pipe.Expire(ctx, key, 72*time.Hour)
 	if _, err := pipe.Exec(ctx); err != nil {
 		metrics.RedisErrors.WithLabelValues("evidence_log").Inc()
 		logger.Warn("Failed to log evidence message",
