@@ -106,16 +106,20 @@ stop() {
 
 show_logs() {
     cd "$PROJECT_DIR"
-    docker compose logs -f --tail=100 pnj-bot
+    docker compose logs -f --tail=100 pnj-bot pnj-cs-bot
 }
 
 show_status() {
     echo -e "${CYAN}📊 Container Status:${NC}"
-    docker ps -a --filter "name=$CONTAINER_NAME" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}\t{{.Size}}"
+    docker ps -a --filter "name=pnj-" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}\t{{.Size}}"
 
     echo ""
-    echo -e "${CYAN}🏥 Health Check:${NC}"
-    curl -s http://localhost:8080/health 2>/dev/null | python3 -m json.tool 2>/dev/null || echo "   ⚠️  Health endpoint not reachable"
+    echo -e "${CYAN}🏥 Main Bot Health (8080):${NC}"
+    curl -s http://localhost:8080/health 2>/dev/null | python3 -m json.tool 2>/dev/null || echo "   ⚠️  Main Bot endpoint not reachable"
+
+    echo ""
+    echo -e "${CYAN}🏥 CS Bot Health (8081):${NC}"
+    curl -s http://localhost:8081/health 2>/dev/null | python3 -m json.tool 2>/dev/null || echo "   ⚠️  CS Bot endpoint not reachable"
 
     echo ""
     echo -e "${CYAN}💾 Volume Info:${NC}"
@@ -142,24 +146,15 @@ clean() {
 }
 
 backup() {
-    echo -e "${CYAN}💾 Backing up database...${NC}"
+    echo -e "${CYAN}💾 Backing up database using internal script...${NC}"
     mkdir -p "$BACKUP_DIR"
 
-    TIMESTAMP=$(date +%Y%m%d_%H%M%S)
-    BACKUP_FILE="$BACKUP_DIR/pnj_anonymous_${TIMESTAMP}.db"
-
-    docker cp "$CONTAINER_NAME:/app/data/pnj_anonymous.db" "$BACKUP_FILE" 2>/dev/null
-
-    if [ $? -eq 0 ]; then
-        SIZE=$(du -h "$BACKUP_FILE" | cut -f1)
-        echo -e "${GREEN}✅ Backup saved: $BACKUP_FILE ($SIZE)${NC}"
-
-        # Keep only last 10 backups
-        cd "$BACKUP_DIR"
-        ls -t pnj_anonymous_*.db | tail -n +11 | xargs -r rm --
-        echo "   📂 Keeping last 10 backups"
+    if docker exec "$CONTAINER_NAME" /app/scripts/backup.sh; then
+        echo -e "${CYAN}📥 Syncing backups to host...${NC}"
+        docker cp "$CONTAINER_NAME:/app/backups/." "$BACKUP_DIR/"
+        echo -e "${GREEN}✅ Backups successfully created and synced to $BACKUP_DIR${NC}"
     else
-        echo -e "${RED}❌ Backup failed - is the container running?${NC}"
+        echo -e "${RED}❌ Backup script failed - check if container is running and DB is accessible${NC}"
     fi
 }
 

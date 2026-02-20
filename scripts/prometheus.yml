@@ -5,3 +5,6 @@ scrape_configs:
   - job_name: 'pnj-bot'
     static_configs:
       - targets: ['pnj-bot:8080']
+  - job_name: 'pnj-cs-bot'
+    static_configs:
+      - targets: ['pnj-cs-bot:8080']

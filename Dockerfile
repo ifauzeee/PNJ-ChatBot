@@ -60,6 +60,7 @@ RUN apk add --no-cache \
     ca-certificates \
     tzdata \
     curl \
+    postgresql-client \
     && rm -rf /var/cache/apk/*
 
 # Set timezone to Asia/Jakarta (WIB)

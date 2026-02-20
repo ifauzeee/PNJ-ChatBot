@@ -102,7 +102,7 @@ make run
 ### Build
 ```bash
 make build
-# Binary akan ada di ./bin/pnj-bot.exe
+# Binary akan ada di ./bin/pnj-bot dan ./bin/pnj-csbot
 ```
 
 ## 📁 Struktur Project

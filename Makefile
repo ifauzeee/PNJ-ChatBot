@@ -34,8 +34,8 @@ help:
 build:
 	@echo "🏗️  Building binaries..."
 	@mkdir -p bin
-	go build -o bin/pnj-bot.exe ./cmd/bot/
-	go build -o bin/pnj-csbot.exe ./cmd/csbot/
+	go build -o bin/pnj-bot ./cmd/bot/
+	go build -o bin/pnj-csbot ./cmd/csbot/
 
 # Run the bot locally
 run:
@@ -98,13 +98,16 @@ docker-stop:
 
 # View live logs
 docker-logs:
-	docker compose logs -f --tail=100 pnj-bot
+	docker compose logs -f --tail=100 pnj-bot pnj-cs-bot
 
 # Check container status & health
 docker-status:
-	@docker ps -a --filter "name=pnj-anonymous-bot" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}\t{{.Size}}"
+	@docker ps -a --filter "name=pnj-" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}\t{{.Size}}"
 	@echo ""
-	@curl -s http://localhost:8080/health 2>/dev/null || echo "⚠️  Health endpoint not reachable"
+	@echo "🔍 Main Bot Health:"
+	@curl -s http://localhost:8080/health 2>/dev/null || echo "   ⚠️  Main Bot (8080) not reachable"
+	@echo "🔍 CS Bot Health:"
+	@curl -s http://localhost:8081/health 2>/dev/null || echo "   ⚠️  CS Bot (8081) not reachable"
 
 # Restart containers
 docker-restart:
@@ -117,8 +120,11 @@ docker-clean:
 # Backup database from container
 docker-backup:
 	@mkdir -p backups
-	docker cp pnj-anonymous-bot:/app/data/pnj_anonymous.db backups/pnj_anonymous_$$(date +%Y%m%d_%H%M%S).db
-	@echo "✅ Backup saved to backups/"
+	@echo "💾 Executing backup script in container..."
+	docker exec pnj-anonymous-bot /app/scripts/backup.sh
+	@echo "📥 Copying backup files to host..."
+	docker cp pnj-anonymous-bot:/app/backups/. ./backups/
+	@echo "✅ Backups synced to backups/ directory"
 
 # Rebuild without cache
 docker-rebuild:

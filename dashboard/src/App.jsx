@@ -13,7 +13,21 @@ import {
   LayoutDashboard
 } from 'lucide-react';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080';
+const getApiUrl = () => {
+  // 1. Priority: Vite environment variable (set during build)
+  if (import.meta.env.VITE_API_BASE_URL) {
+    return import.meta.env.VITE_API_BASE_URL;
+  }
+
+  // 2. Dynamic fallback: current browser hostname on port 8080
+  if (typeof window !== 'undefined') {
+    return `${window.location.protocol}//${window.location.hostname}:8080`;
+  }
+
+  return 'http://localhost:8080';
+};
+
+const API_BASE_URL = getApiUrl();
 
 function App() {
   const [data, setData] = useState(null);

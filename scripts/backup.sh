@@ -14,7 +14,8 @@ echo "🚀 Starting backup at $TIMESTAMP..."
 if [ "$DB_TYPE" = "postgres" ]; then
     FILENAME="pnj_backup_pg_$TIMESTAMP.sql.gz"
     echo "📦 Backing up PostgreSQL database: $DB_NAME..."
-    # PGPASSWORD is expected to be set in environment
+    # Map DB_PASSWORD to PGPASSWORD for pg_dump
+    export PGPASSWORD="$DB_PASSWORD"
     pg_dump -h "$DB_HOST" -U "$DB_USER" "$DB_NAME" | gzip > "$BACKUP_DIR/$FILENAME"
 else
     FILENAME="pnj_backup_sqlite_$TIMESTAMP.db"
