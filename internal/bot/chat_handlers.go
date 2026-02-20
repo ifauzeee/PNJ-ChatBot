@@ -218,8 +218,9 @@ func (b *Bot) handleChatMessage(ctx context.Context, msg *tgbotapi.Message) {
 		b.sendMessage(partnerID, escapeMarkdown(text), nil)
 
 		rewardKey := fmt.Sprintf("reward_cooldown:%d", telegramID)
-		allowed, _ := b.redisSvc.GetClient().SetNX(ctx, rewardKey, "1", 10*time.Second).Result()
-		if allowed {
+		count, _ := b.redisSvc.GetClient().Incr(ctx, rewardKey).Result()
+		if count == 1 {
+			b.redisSvc.GetClient().Expire(ctx, rewardKey, 10*time.Second)
 			b.processReward(ctx, telegramID, "chat_message")
 		}
 
