@@ -273,7 +273,7 @@ func (b *Bot) startHealthServer(ctx context.Context) {
 		}
 	}()
 
-	logger.Info("🏥 Health check server listening on :"+port)
+	logger.Info("🏥 Health check server listening on :" + port)
 	if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		logger.Error("⚠️ Health check server error", zap.Error(err))
 	}

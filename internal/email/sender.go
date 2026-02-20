@@ -26,7 +26,6 @@ func GenerateOTP(length int) string {
 	code := make([]byte, length)
 	for i := 0; i < length; i++ {
 		num, _ := rand.Int(rand.Reader, big.NewInt(10))
-		// G115 fix: num is [0, 9], so it's always safe to cast to byte
 		digit := num.Int64()
 		if digit < 0 || digit > 9 {
 			digit = 0

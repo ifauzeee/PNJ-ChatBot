@@ -68,7 +68,6 @@ func Info(msg string, fields ...zap.Field) {
 func Error(msg string, fields ...zap.Field) {
 	Log.Error(msg, fields...)
 
-	// Report to Sentry if initialized
 	sentry.CaptureMessage(msg)
 }
 

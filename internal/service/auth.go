@@ -148,7 +148,7 @@ func (s *AuthService) recordOTPFailure(ctx context.Context, telegramID int64) {
 	if err != nil {
 		return
 	}
-	
+
 	if count == 1 {
 		s.redis.Expire(ctx, key, 15*time.Minute)
 	}

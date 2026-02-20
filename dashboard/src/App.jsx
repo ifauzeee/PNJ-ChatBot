@@ -14,12 +14,10 @@ import {
 } from 'lucide-react';
 
 const getApiUrl = () => {
-  // 1. Priority: Vite environment variable (set during build)
   if (import.meta.env.VITE_API_BASE_URL) {
     return import.meta.env.VITE_API_BASE_URL;
   }
 
-  // 2. Dynamic fallback: current browser hostname on port 8080
   if (typeof window !== 'undefined') {
     return `${window.location.protocol}//${window.location.hostname}:8080`;
   }

@@ -61,7 +61,6 @@ func TestSanitizeText(t *testing.T) {
 	}
 }
 
-
 func TestContainsOnlyPrintable(t *testing.T) {
 	if !ContainsOnlyPrintable("Hello World\nNew line") {
 		t.Error("Expected true for normal text")

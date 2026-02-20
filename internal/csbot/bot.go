@@ -310,7 +310,7 @@ func (b *CSBot) startHealthServer(ctx context.Context) {
 		}
 	}()
 
-	logger.Info("🏥 CS Health check server listening on :"+port)
+	logger.Info("🏥 CS Health check server listening on :" + port)
 	if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		logger.Error("⚠️ CS Health check server error", zap.Error(err))
 	}
