@@ -104,15 +104,21 @@ func TestValidateClampsBadValues(t *testing.T) {
 
 func TestGetEnvHelpers(t *testing.T) {
 	os.Setenv("TEST_STRING", "hello")
-	os.Setenv("TEST_INT", "42")
-	os.Setenv("TEST_BOOL", "true")
-	os.Setenv("TEST_INT64", "9999999999")
+	os.Setenv("TEST_INT", " 42  ")
+	os.Setenv("TEST_BOOL", " true ")
+	os.Setenv("TEST_INT64", " 9999999999 ")
+	os.Setenv("TEST_TRIM", " value with space ")
 	defer func() {
 		os.Unsetenv("TEST_STRING")
 		os.Unsetenv("TEST_INT")
 		os.Unsetenv("TEST_BOOL")
 		os.Unsetenv("TEST_INT64")
+		os.Unsetenv("TEST_TRIM")
 	}()
+
+	if v := getEnv("TEST_TRIM", "default"); v != "value with space" {
+		t.Errorf("getEnv trim = %q, want %q", v, "value with space")
+	}
 
 	if v := getEnv("TEST_STRING", "default"); v != "hello" {
 		t.Errorf("getEnv = %q, want %q", v, "hello")

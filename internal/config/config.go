@@ -4,6 +4,7 @@ import (
 	"errors"
 	"os"
 	"strconv"
+	"strings"
 
 	"github.com/joho/godotenv"
 	"github.com/pnj-anonymous-bot/internal/logger"
@@ -178,13 +179,14 @@ func (cfg *Config) validate() {
 
 func getEnv(key, defaultVal string) string {
 	if val, ok := os.LookupEnv(key); ok {
-		return val
+		return strings.TrimSpace(val)
 	}
 	return defaultVal
 }
 
 func getEnvInt(key string, defaultVal int) int {
 	if val, ok := os.LookupEnv(key); ok {
+		val = strings.TrimSpace(val)
 		if i, err := strconv.Atoi(val); err == nil {
 			return i
 		}
@@ -194,6 +196,7 @@ func getEnvInt(key string, defaultVal int) int {
 
 func getEnvBool(key string, defaultVal bool) bool {
 	if val, ok := os.LookupEnv(key); ok {
+		val = strings.TrimSpace(val)
 		if b, err := strconv.ParseBool(val); err == nil {
 			return b
 		}
@@ -203,6 +206,7 @@ func getEnvBool(key string, defaultVal bool) bool {
 
 func getEnvInt64(key string, defaultVal int64) int64 {
 	if val, ok := os.LookupEnv(key); ok {
+		val = strings.TrimSpace(val)
 		if i, err := strconv.ParseInt(val, 10, 64); err == nil {
 			return i
 		}
