@@ -62,6 +62,23 @@ services:
       - '--storage.tsdb.path=/prometheus'
       - '--log.level=warn'
 
+  # Monitoring: Grafana
+  grafana:
+    image: grafana/grafana:latest
+    container_name: pnj-grafana
+    restart: unless-stopped
+    ports:
+      - "3002:3000"
+    volumes:
+      - ./scripts/grafana/provisioning:/etc/grafana/provisioning
+      - grafana-data:/var/lib/grafana
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-admin}
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
+    depends_on:
+      - prometheus
+
   # Custom Web Dashboard
   pnj-dashboard:
     build:
@@ -150,4 +167,6 @@ volumes:
   redis-data:
     driver: local
   prometheus-data:
+    driver: local
+  grafana-data:
     driver: local
