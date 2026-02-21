@@ -50,6 +50,8 @@ var (
 	})
 )
 
+const numShards = 128
+
 type Bot struct {
 	api          *tgbotapi.BotAPI
 	cfg          *config.Config
@@ -68,9 +70,13 @@ type Bot struct {
 	updateQ      chan tgbotapi.Update
 	updateWG     sync.WaitGroup
 	background   sync.WaitGroup
-	userLocks    sync.Map
+	userShards   [numShards]sync.Mutex
 	handlers     map[string]func(context.Context, *tgbotapi.Message)
 	callbacks    map[string]func(context.Context, int64, string, *tgbotapi.CallbackQuery)
+}
+
+func (b *Bot) getUserLock(userID int64) *sync.Mutex {
+	return &b.userShards[uint64(userID)%numShards]
 }
 
 func New(cfg *config.Config, db *database.DB) (*Bot, error) {
@@ -537,16 +543,6 @@ func (b *Bot) extractUpdateUserID(update tgbotapi.Update) (int64, bool) {
 		return update.Message.From.ID, true
 	}
 	return 0, false
-}
-
-func (b *Bot) getUserLock(userID int64) *sync.Mutex {
-	if lock, ok := b.userLocks.Load(userID); ok {
-		return lock.(*sync.Mutex)
-	}
-
-	newLock := &sync.Mutex{}
-	actual, _ := b.userLocks.LoadOrStore(userID, newLock)
-	return actual.(*sync.Mutex)
 }
 
 func (b *Bot) handleCommand(ctx context.Context, msg *tgbotapi.Message) {
