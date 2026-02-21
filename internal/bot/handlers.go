@@ -29,8 +29,6 @@ Hai <b>%s</b>! 👋
 
 Bot ini adalah platform anonim khusus untuk <b>mahasiswa Politeknik Negeri Jakarta</b> 🏛️
 
-Support developer bot ini dengan berdonasi di:
-https://saweria.co/ifauzeee/
 
 ━━━━━━━━━━━━━━━━━━━
 ⚖️ <b>DISCLAIMER & LEGAL:</b>
